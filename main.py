@@ -6,30 +6,22 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 # --- SOZLAMALAR VA ID'LAR ---
-BOT_TOKEN = "8784665419:AAE8dF85EpYIA4vWX_5CTP30jzumqIUfREg"  # Tokeningiz
-DOMAIN = "https://uzprofshop.onrender.com"
 DB_PATH = "uzprof.db"
 
 OWNER_ID = 7686687044
 ADMIN_ID = 7875662532
 
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
-
 os.makedirs("static/uploads", exist_ok=True)
 
-# --- ZAMONAVIY VA KAFOLATLANGAN DIZAYN ---
+# --- ZAMONAVIY VA TO'LIQ ISHLaydigan WEB-ILOVA (HTML/CSS/JS) ---
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Uzprof.shop - Raqamli Bozor</title>
+    <title>Uzprof.shop - Raqamli Xizmatlar</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
@@ -44,12 +36,14 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
         body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-gradient); color: var(--text-main); min-height: 100vh; margin: 0; padding: 16px; }
         .app-container { max-width: 480px; margin: 0 auto; padding-bottom: 80px; }
+        
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-glass); padding: 14px 18px; border-radius: 16px; }
         .logo { font-size: 18px; font-weight: 800; background: linear-gradient(90deg, #818cf8, #38bdf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .user-badge { font-size: 11px; background: rgba(99, 102, 241, 0.2); color: #818cf8; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(99, 102, 241, 0.3); }
         
         .search-box { position: relative; margin-bottom: 15px; }
         .search-box input { width: 100%; padding: 12px 16px 12px 42px; background: var(--card-bg); border: 1px solid var(--border-glass); border-radius: 12px; color: #fff; font-size: 14px; outline: none; box-sizing: border-box; }
+        .search-box input:focus { border-color: var(--primary); }
         .search-icon { position: absolute; left: 14px; top: 14px; color: var(--text-muted); }
 
         .menu-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 20px; scrollbar-width: none; }
@@ -67,48 +61,60 @@ HTML_CONTENT = """<!DOCTYPE html>
         .card-body { padding: 16px; }
         .card-cat { font-size: 11px; color: var(--accent); text-transform: uppercase; font-weight: 700; margin-bottom: 6px; }
         .card-title { font-size: 16px; font-weight: 700; margin: 0 0 8px 0; color: #fff; }
-        .card-desc { font-size: 13px; color: var(--text-muted); margin: 0; line-height: 1.4; }
+        .card-desc { font-size: 13px; color: var(--text-muted); margin: 0; line-height: 1.4; white-space: pre-wrap; }
 
         .form-card { background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-glass); padding: 20px; border-radius: 16px; }
         .form-group { margin-bottom: 14px; }
         label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
         input, select, textarea { width: 100%; padding: 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-glass); border-radius: 10px; color: #fff; font-size: 14px; box-sizing: border-box; outline: none; }
-        .btn-submit { width: 100%; background: var(--primary); color: white; border: none; padding: 14px; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; }
+        input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+        .btn-submit { width: 100%; background: var(--primary); color: white; border: none; padding: 14px; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; transition: 0.2s; }
+        .btn-submit:hover { background: var(--primary-hover); }
+
         .admin-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 10px 14px; border-radius: 10px; margin-bottom: 8px; font-size: 13px; }
         .delete-btn { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="app-container">
+        <!-- Header -->
         <div class="header">
             <div class="logo">⚡ Uzprof.shop</div>
-            <div class="user-badge" id="userBadge">ID aniqlanmoqda...</div>
+            <div class="user-badge" id="userBadge">ID: aniqlanmoqda...</div>
         </div>
 
+        <!-- Navigation Tabs -->
         <div class="nav-tabs">
             <button class="tab-btn active" onclick="switchTab('feed')" id="tabFeed">📦 E'lonlar</button>
             <button class="tab-btn" onclick="switchTab('add')" id="tabAdd">➕ E'lon berish</button>
             <button class="tab-btn" onclick="switchTab('admin')" id="tabAdmin" style="display:none;">⚙️ Admin Panel</button>
         </div>
 
+        <!-- Feed Section -->
         <div id="sectionFeed">
             <div class="search-box">
                 <span class="search-icon">🔍</span>
                 <input type="text" id="searchInput" placeholder="Xizmat yoki mahsulotlarni qidirish..." oninput="filterProducts()">
             </div>
-            <div class="menu-scroll">
+
+            <!-- Categories Menu -->
+            <div class="menu-scroll" id="menuScroll">
                 <div class="menu-pill active" onclick="selectCategory('Barchasi', this)">🔥 Barchasi</div>
                 <div class="menu-pill" onclick="selectCategory('Telegram Botlar', this)">🤖 Telegram Botlar</div>
                 <div class="menu-pill" onclick="selectCategory('Web Dasturlash', this)">💻 Web Dasturlash</div>
                 <div class="menu-pill" onclick="selectCategory('Skriptlar va Kodlar', this)">📜 Skriptlar</div>
                 <div class="menu-pill" onclick="selectCategory('Dizayn va Grafika', this)">🎨 Dizayn</div>
             </div>
-            <div class="product-grid" id="productGrid"></div>
+
+            <div class="product-grid" id="productGrid">
+                <!-- E'lonlar shu yerga chiqadi -->
+            </div>
         </div>
 
+        <!-- Add Product Section -->
         <div id="sectionAdd" style="display:none;">
             <div class="form-card">
-                <h3 style="margin-top:0; color:#fff;">Yangi E'lon Qo'shish</h3>
+                <h3 style="margin-top:0; color:#fff;">Yangi E'lon Berish</h3>
                 <div class="form-group">
                     <label>Kategoriya</label>
                     <select id="pCat">
@@ -120,26 +126,29 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
                 <div class="form-group">
                     <label>Sarlavha (Nomi)</label>
-                    <input type="text" id="pTitle" placeholder="Masalan: Professional Telegram bot">
+                    <input type="text" id="pTitle" placeholder="Masalan: PHP da Telegram Bot yaratish">
                 </div>
                 <div class="form-group">
                     <label>Batafsil tavsif va narxi</label>
-                    <textarea id="pDesc" rows="3" placeholder="Narxi, imkoniyatlari va shartlari..."></textarea>
+                    <textarea id="pDesc" rows="4" placeholder="Xizmat haqida batafsil ma'lumot va narxi..."></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Mahsulot/Xizmat rasmi</label>
+                    <label>Rasm yuklash</label>
                     <input type="file" id="pImage" accept="image/*">
                 </div>
-                <button class="btn-submit" onclick="submitProduct()">🚀 E'lonni Jo'natish</button>
+                <button class="btn-submit" onclick="submitProduct()">🚀 E'lonni Joylash</button>
                 <p id="formMsg" style="text-align:center; font-size:13px; margin-top:10px; font-weight:600;"></p>
             </div>
         </div>
 
+        <!-- Admin Panel Section -->
         <div id="sectionAdmin" style="display:none;">
             <div class="form-card">
                 <h3 style="margin-top:0; color:#fff;">Admin Boshqaruvi</h3>
-                <p style="font-size:12px; color:var(--text-muted);">Barcha e'lonlarni boshqarish va o'chirish.</p>
-                <div id="adminProductList"></div>
+                <p style="font-size:12px; color:var(--text-muted);">Barcha e'lonlarni nazorat qilish va o'chirish.</p>
+                <div id="adminProductList">
+                    <!-- Admin ro'yxati -->
+                </div>
             </div>
         </div>
     </div>
@@ -148,15 +157,20 @@ HTML_CONTENT = """<!DOCTYPE html>
         let tg = window.Telegram.WebApp;
         tg.expand();
         
-        // Telegram ID ni aniqlash (Agar brauzerdan ochilsa URL parametridan oladi)
-        const urlParams = new URLSearchParams(window.location.search);
-        let urlUserId = urlParams.get('user_id');
-
-        let userId = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user.id : (urlUserId ? parseInt(urlUserId) : 7686687044);
+        // Telegram ID ni aniqlash (Agar brauzerdan ochilsa Owner ID ni beradi)
+        let userId = 7686687044; // Default Owner ID to ensure it works anywhere
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user && tg.initDataUnsafe.user.id) {
+            userId = tg.initDataUnsafe.user.id;
+        } else {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('user_id')) {
+                userId = parseInt(urlParams.get('user_id'));
+            }
+        }
         
         document.getElementById('userBadge').innerText = `ID: ${userId}`;
 
-        // Adminlar ro'yxati
+        // Admin va Owner ID tekshiruvi
         const ADMINS = [7686687044, 7875662532];
         if (ADMINS.includes(userId)) {
             document.getElementById('tabAdmin').style.display = 'block';
@@ -179,9 +193,13 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         async function loadProducts() {
-            let res = await fetch('/api/products');
-            allProducts = await res.json();
-            renderProducts(allProducts);
+            try {
+                let res = await fetch('/api/products');
+                allProducts = await res.json();
+                renderProducts(allProducts);
+            } catch (e) {
+                console.error(e);
+            }
         }
 
         function renderProducts(products) {
@@ -196,7 +214,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             });
 
             if (filtered.length === 0) {
-                grid.innerHTML = '<p style="text-align:center; color:var(--text-muted); font-size:13px;">E\'lonlar topilmadi.</p>';
+                grid.innerHTML = '<p style="text-align:center; color:var(--text-muted); font-size:13px; margin-top:20px;">Hozircha e\'lonlar topilmadi.</p>';
                 return;
             }
 
@@ -222,20 +240,35 @@ HTML_CONTENT = """<!DOCTYPE html>
             renderProducts(allProducts);
         }
 
-        function filterProducts() { renderProducts(allProducts); }
+        function filterProducts() {
+            renderProducts(allProducts);
+        }
 
         async function submitProduct() {
+            let title = document.getElementById('pTitle').value.trim();
+            let description = document.getElementById('pDesc').value.trim();
+            let msg = document.getElementById('formMsg');
+
+            if (!title || !description) {
+                msg.style.color = '#ef4444';
+                msg.innerText = '⚠️ Iltimos, sarlavha va tavsifni to\'ldiring!';
+                return;
+            }
+
             let fd = new FormData();
             fd.append("user_id", userId);
             fd.append("category", document.getElementById('pCat').value);
-            fd.append("title", document.getElementById('pTitle').value);
-            fd.append("description", document.getElementById('pDesc').value);
+            fd.append("title", title);
+            fd.append("description", description);
             let img = document.getElementById('pImage').files[0];
             if (img) fd.append("image", img);
 
+            msg.style.color = '#38bdf8';
+            msg.innerText = '⏳ Jo\'natilmoqda...';
+
             let res = await fetch('/api/add_product', { method: 'POST', body: fd });
             let data = await res.json();
-            let msg = document.getElementById('formMsg');
+            
             msg.style.color = data.success ? '#38bdf8' : '#ef4444';
             msg.innerText = data.message;
 
@@ -243,7 +276,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 document.getElementById('pTitle').value = '';
                 document.getElementById('pDesc').value = '';
                 document.getElementById('pImage').value = '';
-                setTimeout(() => switchTab('feed'), 1200);
+                setTimeout(() => switchTab('feed'), 1000);
             }
         }
 
@@ -264,7 +297,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 item.innerHTML = `
                     <div>
                         <strong style="color:#fff;">${p.title}</strong><br>
-                        <span style="font-size:11px; color:var(--text-muted);">${p.category}</span>
+                        <span style="font-size:11px; color:var(--text-muted);">${p.category} (ID: ${p.user_id})</span>
                     </div>
                     <button class="delete-btn" onclick="deleteProduct(${p.id})">O'chirish</button>
                 `;
@@ -279,7 +312,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             fd.append("user_id", userId);
             let res = await fetch('/api/delete_product', { method: 'POST', body: fd });
             let data = await res.json();
-            if (data.success) loadAdminProducts();
+            if (data.success) {
+                loadAdminProducts();
+            } else {
+                alert(data.message);
+            }
         }
 
         loadProducts();
@@ -287,7 +324,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 </body>
 </html>"""
 
-# --- BAZA VA SERVER ---
+# --- BAZA BILAN ISHLASH ---
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -307,16 +344,7 @@ def init_db():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    try:
-        await bot.set_webhook(f"{DOMAIN}/webhook")
-    except:
-        pass
     yield
-    try:
-        await bot.delete_webhook()
-    except:
-        pass
-    await bot.session.close()
 
 app = FastAPI(title="Uzprof.shop", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -332,10 +360,27 @@ async def get_products():
     c.execute("SELECT id, user_id, category, title, description, image_path FROM products ORDER BY id DESC")
     rows = c.fetchall()
     conn.close()
-    return [{"id": r[0], "user_id": r[1], "category": r[2], "title": r[3], "description": r[4], "image_path": r[5]} for r in rows]
+    
+    products = []
+    for r in rows:
+        products.append({
+            "id": r[0],
+            "user_id": r[1],
+            "category": r[2],
+            "title": r[3],
+            "description": r[4],
+            "image_path": r[5]
+        })
+    return products
 
 @app.post("/api/add_product")
-async def add_product(user_id: int = Form(...), category: str = Form(...), title: str = Form(...), description: str = Form(...), image: UploadFile = File(None)):
+async def add_product(
+    user_id: int = Form(...),
+    category: str = Form(...),
+    title: str = Form(...),
+    description: str = Form(...),
+    image: UploadFile = File(None)
+):
     image_url = None
     if image and image.filename:
         ext = image.filename.split(".")[-1]
@@ -347,19 +392,12 @@ async def add_product(user_id: int = Form(...), category: str = Form(...), title
 
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute("INSERT INTO products (user_id, category, title, description, image_path) VALUES (?, ?, ?, ?, ?)", (user_id, category, title, description, image_url))
+    c.execute(
+        "INSERT INTO products (user_id, category, title, description, image_path) VALUES (?, ?, ?, ?, ?)",
+        (user_id, category, title, description, image_url)
+    )
     conn.commit()
     conn.close()
-
-    notif = f"📦 **Yangi e'lon!**\n\n🏷️ Kategoriya: {category}\n📝 Nomi: {title}\n📄 Tavsif: {description}"
-    for admin in [OWNER_ID, ADMIN_ID]:
-        try:
-            if image_url:
-                await bot.send_photo(admin, photo=types.URLInputFile(f"{DOMAIN}{image_url}"), caption=notif)
-            else:
-                await bot.send_message(admin, notif)
-        except:
-            pass
 
     return {"success": True, "message": "✅ E'loningiz muvaffaqiyatli joylandi!"}
 
@@ -367,21 +405,10 @@ async def add_product(user_id: int = Form(...), category: str = Form(...), title
 async def delete_product(product_id: int = Form(...), user_id: int = Form(...)):
     if user_id not in [OWNER_ID, ADMIN_ID]:
         return {"success": False, "message": "Sizda bu huquq yo'q!"}
+    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("DELETE FROM products WHERE id = ?", (product_id,))
     conn.commit()
     conn.close()
     return {"success": True}
-
-@app.post("/webhook")
-async def webhook(req: Request):
-    await dp.feed_update(bot, types.Update(**await req.json()))
-    return {"ok": True}
-
-# --- BOT BUYRUQLARI (WEB-APP TUGMA BILAN) ---
-@dp.message(Command("start"))
-async def start(msg: types.Message):
-    kb = InlineKeyboardBuilder()
-    kb.button(text="🚀 Uzprof.shop ni ochish", web_app=types.WebAppInfo(url=f"{DOMAIN}/?user_id={msg.from_user.id}"))
-    await msg.answer("⚡ **Uzprof.shop** — Raqamli xizmatlar bozori!\n\nPastdagi tugmani bosing:", reply_markup=kb.as_markup())
