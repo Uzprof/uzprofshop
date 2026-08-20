@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -10,11 +11,15 @@ from aiogram.filters import Command
 
 # --- SOZLAMALAR ---
 BOT_TOKEN = "8784665419:AAFeTyDY1eiA9jWuG_smi4Ag2wGA3VSDiQ"
-DOMAIN = "https://uzprofshop.onrender.com"  # Render havolangiz
+DOMAIN = "https://uzprofshop.onrender.com"
 DB_PATH = "uzprof.db"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
+
+# --- PAPKALARNI AVTOMATIK YARATISH ---
+os.makedirs("static", exist_ok=True)
+os.makedirs("templates", exist_ok=True)
 
 # --- BAZANI YARATISH ---
 def init_db():
@@ -65,13 +70,19 @@ def check_is_admin(telegram_id: int) -> bool:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    # Bot uchun Webhook o'rnatamiz (Render doimiy ishlaydi)
     webhook_url = f"{DOMAIN}/webhook"
-    await bot.set_webhook(webhook_url)
-    print(f"Webhook o'rnatildi: {webhook_url}")
+    try:
+        await bot.set_webhook(webhook_url)
+        print(f"Webhook o'rnatildi: {webhook_url}")
+    except Exception as e:
+        print(f"Webhook o'rnatishda xato: {e}")
+    
     yield
-    # Server o'chganda webhook tozalanadi
-    await bot.delete_webhook()
+    
+    try:
+        await bot.delete_webhook()
+    except:
+        pass
     await bot.session.close()
 
 app = FastAPI(title="Uzprof.shop API", lifespan=lifespan)
@@ -79,10 +90,9 @@ app = FastAPI(title="Uzprof.shop API", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# --- TELEGRAM WEBHOOK QULOG'I (BOTNI 24/7 ISHLatuvchi QISM) ---
+# --- TELEGRAM WEBHOOK QULOG'I ---
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
-    """Telegramdan keladigan barcha xabarlarni qabul qilib botga uzatadi"""
     try:
         json_data = await request.json()
         update = types.Update(**json_data)
@@ -99,7 +109,6 @@ async def index(request: Request):
 
 @app.post("/add_admin")
 async def add_admin_endpoint(telegram_id: int = Form(...)):
-    """Admin qo'shish"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
@@ -115,7 +124,6 @@ async def add_admin_endpoint(telegram_id: int = Form(...)):
 
 @app.post("/add_product")
 async def add_product(user_id: int = Form(...), title: str = Form(...), description: str = Form(...)):
-    """E'lon berish"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
@@ -130,7 +138,6 @@ async def add_product(user_id: int = Form(...), title: str = Form(...), descript
 
 @app.post("/approve_product")
 async def approve_product(product_id: int = Form(...), admin_id: int = Form(...)):
-    """Admin e'lonni tasdiqlashi"""
     if not check_is_admin(admin_id):
         return JSONResponse({"success": False, "message": "Sizda admin huquqi yo'q!"}, status_code=403)
     
@@ -147,7 +154,6 @@ async def approve_product(product_id: int = Form(...), admin_id: int = Form(...)
 
 @app.post("/delete_product")
 async def delete_product(product_id: int = Form(...), user_id: int = Form(...)):
-    """E'lonni o'chirish (Admin yoki egasi)"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     try:
