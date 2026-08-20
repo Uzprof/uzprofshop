@@ -17,9 +17,82 @@ DB_PATH = "uzprof.db"
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# --- PAPKALARNI AVTOMATIK YARATISH ---
+# --- PAPKA VA FAYLLARNI AVTOMATIK YARATISH (XATOLIKNI OLDINI OLISH) ---
 os.makedirs("static", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
+
+index_html_path = os.path.join("templates", "index.html")
+if not os.path.exists(index_html_path):
+    with open(index_html_path, "w", encoding="utf-8") as f:
+        f.write("""<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uzprof.shop</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f9; color: #333; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h2 { color: #2ea44f; }
+        button { width: 100%; padding: 12px; background: #2ea44f; color: white; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        button:hover { background: #2c974b; }
+        input { width: 100%; padding: 10px; margin-top: 5px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🛍️ Uzprof.shop Panel</h2>
+        <p>Telegram ID: <span id="user-id" style="font-weight:bold; color:#0088cc;">Aniqlanmoqda...</span></p>
+        
+        <h3>Admin boshqaruvi</h3>
+        <button onclick="addAdmin()">⭐️ Admin bo'lish</button>
+        
+        <h3>Yangi e'lon berish</h3>
+        <input type="text" id="title" placeholder="Mahsulot nomi">
+        <input type="text" id="desc" placeholder="Tavsifi">
+        <button onclick="addProduct()">📦 E'lonni yuborish</button>
+        
+        <p id="status-msg" style="margin-top: 15px; font-weight: bold; text-align: center; color: #d9534f;"></p>
+    </div>
+    <script>
+        let tg = window.Telegram.WebApp;
+        tg.expand();
+        let userId = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null;
+        
+        if (!userId) {
+            document.getElementById('user-id').innerText = "Topilmadi (Botdan kiring)";
+        } else {
+            document.getElementById('user-id').innerText = userId;
+        }
+
+        function addAdmin() {
+            if (!userId) { alert("Telegram ID topilmadi!"); return; }
+            let formData = new URLSearchParams();
+            formData.append("telegram_id", userId);
+            fetch('/add_admin', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => { document.getElementById('status-msg').style.color = data.success ? 'green' : 'red'; document.getElementById('status-msg').innerText = data.message; });
+        }
+
+        function addProduct() {
+            if (!userId) { alert("Telegram ID topilmadi!"); return; }
+            let title = document.getElementById('title').value;
+            let desc = document.getElementById('desc').value;
+            if(!title || !desc) { alert("Barcha maydonlarni to'ldiring!"); return; }
+            
+            let formData = new URLSearchParams();
+            formData.append("user_id", userId);
+            formData.append("title", title);
+            formData.append("description", desc);
+            
+            fetch('/add_product', { method: 'POST', body: formData })
+            .then(res => res.json())
+            .then(data => { document.getElementById('status-msg').style.color = data.success ? 'green' : 'red'; document.getElementById('status-msg').innerText = data.message; });
+        }
+    </script>
+</body>
+</html>""")
 
 # --- BAZANI YARATISH ---
 def init_db():
@@ -166,7 +239,7 @@ async def delete_product(product_id: int = Form(...), user_id: int = Form(...)):
         if owner_id == user_id or check_is_admin(user_id):
             cursor.execute("DELETE FROM products WHERE id = ?", (product_id,))
             conn.commit()
-            return JSONResponse({"success": True, "message": "E'lon o'chirildi!"})
+            return JSONResponse({"success":` True, "message": "E'lon o'chirildi!"})
         else:
             return JSONResponse({"success": False, "message": "Huquqingiz yo'q!"}, status_code=403)
     except Exception as e:
