@@ -1,159 +1,472 @@
-import os, sqlite3, shutil, asyncio
-from typing import Optional
-from fastapi import FastAPI, Request, Form, File, UploadFile, Query, HTTPException
+import os
+import shutil
+import sqlite3
+import asyncio
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request, Form, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
 
-import database as db
-
-BOT_TOKEN = "8784665419:AAFeTYdY1eiA9jWu_G_smi4Ag2wGA3VSDiQ"
-DOMAIN = "http://localhost:8000"
-
-bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
-app = FastAPI(title="Uzprof.shop API")
+# --- SOZLAMALAR ---
+DB_PATH = "uzprof.db"
+OWNER_ID = 7686687044
 
 os.makedirs("static/uploads", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
 
-@dp.message(Command("start"))
-async def start_cmd(message: types.Message):
-    conn = db.get_db()
-    conn.execute("""
-        INSERT INTO users (telegram_id, username, full_name)
-        VALUES (?, ?, ?) ON CONFLICT(telegram_id) DO UPDATE SET username=?, full_name=?
-    """, (message.from_user.id, message.from_user.username, message.from_user.full_name,
-          message.from_user.username, message.from_user.full_name))
+# --- BAZANI REJASINI YARATISH VA YANGILASH ---
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    # E'lonlar jadvali
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS products (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER,
+            category TEXT,
+            title TEXT,
+            description TEXT,
+            price TEXT,
+            old_price TEXT,
+            contact_url TEXT,
+            image_path TEXT
+        )
+    """)
+    # Adminlar jadvali (Username va Telegram ID bo'yicha)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS admins (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE,
+            telegram_id INTEGER UNIQUE
+        )
+    """)
+    # Owner va asosiy adminni bazaga qo'shib qo'yish
+    c.execute("INSERT OR IGNORE INTO admins (telegram_id) VALUES (?)", (OWNER_ID,))
+    c.execute("INSERT OR IGNORE INTO admins (telegram_id) VALUES (?)", (7875662532,))
     conn.commit()
     conn.close()
 
-    kb = types.InlineKeyboardMarkup(
-        inline_keyboard=[[
-            types.InlineKeyboardButton(text="🛍️ Uzprof.shop Bozoriga kirish", web_app=types.WebAppInfo(url=DOMAIN))
-        ]]
-    )
-    await message.answer(f"Xush kelibsiz, {message.from_user.first_name}!\nUzprof.shop milliy bozorida xarid qiling yoki e'lon joylang.", reply_markup=kb)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
+
+app = FastAPI(title="Uzprof.shop", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# --- HTML / CSS / JS (SKRINSHAT DIZAYNIDA) ---
+HTML_CONTENT = """<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uzprof.shop</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --bg-color: #f3f4f6;
+            --card-bg: #ffffff;
+            --primary: #6d28d9;
+            --primary-hover: #5b21b6;
+            --text-main: #111827;
+            --text-muted: #6b7280;
+            --border: #e5e7eb;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; padding: 12px; padding-bottom: 80px; }
+        .container { max-width: 480px; margin: 0 auto; }
+        
+        /* Top Header */
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .logo { font-size: 22px; font-weight: 900; color: var(--primary); }
+        .badge { font-size: 10px; font-weight: 800; background: #e5e7eb; color: #374151; padding: 3px 8px; border-radius: 6px; letter-spacing: 0.5px; }
+
+        /* Search Box */
+        .search-box input { width: 100%; padding: 10px 14px; background: #f9fafb; border: 1px solid var(--border); border-radius: 10px; font-size: 13px; color: var(--text-main); box-sizing: border-box; outline: none; margin-bottom: 12px; }
+        
+        /* Category Scroll */
+        .categories { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 14px; scrollbar-width: none; }
+        .categories::-webkit-scrollbar { display: none; }
+        .cat-pill { background: #ffffff; border: 1px solid var(--border); color: #374151; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+        .cat-pill.active { background: var(--primary); color: #ffffff; border-color: var(--primary); }
+
+        /* Product Grid & Card */
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .card { background: var(--card-bg); border-radius: 14px; overflow: hidden; border: 1px solid var(--border); display: flex; flex-direction: column; justify-content: space-between; }
+        .card-img { width: 100%; height: 130px; object-fit: cover; background: #e5e7eb; }
+        .card-body { padding: 10px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .card-title { font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 6px; line-height: 1.2; }
+        .price-box { margin-bottom: 8px; }
+        .price { font-size: 14px; font-weight: 800; color: var(--primary); }
+        .old-price { font-size: 11px; color: var(--text-muted); text-decoration: line-through; margin-left: 4px; }
+        .btn-contact { width: 100%; background: var(--primary); color: white; border: none; padding: 8px 0; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 4px; }
+
+        /* Forms & Inputs */
+        .form-card { background: white; padding: 16px; border-radius: 14px; border: 1px solid var(--border); margin-bottom: 12px; }
+        .form-group { margin-bottom: 10px; }
+        label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; }
+        input, select, textarea { width: 100%; padding: 10px; background: #f9fafb; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; box-sizing: border-box; outline: none; }
+        .btn-submit { width: 100%; background: var(--primary); color: white; border: none; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer; }
+
+        /* Admin Delete List */
+        .admin-item { display: flex; justify-content: space-between; align-items: center; background: #f9fafb; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 6px; font-size: 12px; }
+        .btn-del { background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; }
+
+        /* Bottom Nav */
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 8px 0; max-width: 480px; margin: 0 auto; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 10px; color: var(--text-muted); cursor: pointer; border: none; background: transparent; }
+        .nav-item.active { color: var(--primary); font-weight: 700; }
+        .nav-item svg { width: 20px; height: 20px; margin-bottom: 2px; fill: currentColor; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">Uzprof.shop</div>
+            <div class="badge" id="roleBadge">USER</div>
+        </div>
+
+        <!-- Feed Section -->
+        <div id="secFeed">
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="Mahsulot yoki xizmatlarni qidirish..." oninput="filterProducts()">
+            </div>
+            <div class="categories">
+                <div class="cat-pill active" onclick="setCat('Barchasi', this)">Barchasi</div>
+                <div class="cat-pill" onclick="setCat('📱 Elektronika', this)">📱 Elektronika</div>
+                <div class="cat-pill" onclick="setCat('👔 Kiyim-kechak', this)">👔 Kiyim-kechak</div>
+                <div class="cat-pill" onclick="setCat('🤖 Telegram Bot', this)">🤖 Telegram Bot</div>
+                <div class="cat-pill" onclick="setCat('📜 Skriptlar', this)">📜 Skriptlar</div>
+            </div>
+            <div class="grid" id="productGrid"></div>
+        </div>
+
+        <!-- Add Section -->
+        <div id="secAdd" style="display:none;">
+            <div class="form-card">
+                <h4 style="margin:0 0 12px 0;">Yangi E'lon Berish</h4>
+                <div class="form-group"><label>Kategoriya</label>
+                    <select id="pCat">
+                        <option value="🤖 Telegram Bot">🤖 Telegram Bot</option>
+                        <option value="📜 Skriptlar">📜 Skriptlar</option>
+                        <option value="📱 Elektronika">📱 Elektronika</option>
+                        <option value="👔 Kiyim-kechak">👔 Kiyim-kechak</option>
+                    </select>
+                </div>
+                <div class="form-group"><label>Sarlavha</label><input type="text" id="pTitle" placeholder="Masalan: Telegram bot xizmati"></div>
+                <div class="form-group"><label>Tavsif</label><textarea id="pDesc" rows="3" placeholder="Batafsil ma'lumot..."></textarea></div>
+                <div class="form-group"><label>Narxi (Masalan: 30 000 UZS)</label><input type="text" id="pPrice" placeholder="30 000 UZS"></div>
+                <div class="form-group"><label>Eski narxi (Ixtiyoriy)</label><input type="text" id="pOldPrice" placeholder="59 000 UZS"></div>
+                <div class="form-group"><label>Aloqa uchun havola / Username</label><input type="text" id="pContact" placeholder="https://t.me/username"></div>
+                <div class="form-group"><label>Rasm</label><input type="file" id="pImage" accept="image/*"></div>
+                <button class="btn-submit" onclick="submitProduct()">E'lonni Joylash</button>
+                <p id="addMsg" style="font-size:11px; text-align:center; margin-top:8px;"></p>
+            </div>
+        </div>
+
+        <!-- Admin Section -->
+        <div id="secAdmin" style="display:none;">
+            <div class="form-card">
+                <h4 style="margin:0 0 10px 0;">Admin Qo'shish</h4>
+                <div class="form-group">
+                    <label>Admin Telegram Username (@ bilan yoki usiz)</label>
+                    <input type="text" id="adminUsername" placeholder="masalan: username">
+                </div>
+                <button class="btn-submit" onclick="addAdmin()">Admin Qilish</button>
+                <p id="adminMsg" style="font-size:11px; text-align:center; margin-top:6px;"></p>
+            </div>
+
+            <div class="form-card">
+                <h4 style="margin:0 0 10px 0;">E'lonlarni Boshqarish va O'chirish</h4>
+                <div id="adminProdList"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bottom Navigation Bar -->
+    <div class="bottom-nav">
+        <button class="nav-item active" onclick="nav('feed')" id="navFeed">
+            <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>Bozor
+        </button>
+        <button class="nav-item" onclick="nav('add')" id="navAdd">
+            <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>E'lon Berish
+        </button>
+        <button class="nav-item" onclick="nav('admin')" id="navAdmin" style="display:none;">
+            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-5.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8s0 0 0 0z"/></svg>Admin
+        </button>
+    </div>
+
+    <script>
+        let userId = 7686687044;
+        let userName = '';
+
+        try {
+            if (window.Telegram && window.Telegram.WebApp) {
+                let tg = window.Telegram.WebApp;
+                tg.expand();
+                if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                    userId = tg.initDataUnsafe.user.id;
+                    userName = tg.initDataUnsafe.user.username || '';
+                }
+            }
+        } catch(e){}
+
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('user_id')) userId = parseInt(urlParams.get('user_id'));
+
+        let currentCat = 'Barchasi';
+        let allProducts = [];
+
+        async function checkAdminRights() {
+            let res = await fetch(`/api/check_admin?user_id=${userId}&username=${userName}`);
+            let data = await res.json();
+            if (data.is_admin) {
+                document.getElementById('navAdmin').style.display = 'flex';
+                document.getElementById('roleBadge').innerText = data.is_owner ? 'SUPERADMIN' : 'ADMIN';
+            }
+        }
+
+        function nav(tab) {
+            document.getElementById('secFeed').style.display = tab === 'feed' ? 'block' : 'none';
+            document.getElementById('secAdd').style.display = tab === 'add' ? 'block' : 'none';
+            document.getElementById('secAdmin').style.display = tab === 'admin' ? 'block' : 'none';
+
+            document.getElementById('navFeed').classList.toggle('active', tab === 'feed');
+            document.getElementById('navAdd').classList.toggle('active', tab === 'add');
+            document.getElementById('navAdmin').classList.toggle('active', tab === 'admin');
+
+            if (tab === 'feed') loadProducts();
+            if (tab === 'admin') loadAdminProducts();
+        }
+
+        async function loadProducts() {
+            let res = await fetch('/api/products');
+            allProducts = await res.json();
+            renderProducts(allProducts);
+        }
+
+        function renderProducts(products) {
+            let grid = document.getElementById('productGrid');
+            grid.innerHTML = '';
+            let q = document.getElementById('searchInput').value.toLowerCase();
+
+            let filtered = products.filter(p => {
+                let mCat = (currentCat === 'Barchasi' || p.category === currentCat);
+                let mQ = p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q);
+                return mCat && mQ;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '<p style="grid-column: span 2; text-align:center; font-size:12px; color:var(--text-muted); margin-top:20px;">E\'lonlar topilmadi.</p>';
+                return;
+            }
+
+            filtered.forEach(p => {
+                let card = document.createElement('div');
+                card.className = 'card';
+                card.innerHTML = `
+                    ${p.image_path ? `<img src="${p.image_path}" class="card-img">` : ''}
+                    <div class="card-body">
+                        <div>
+                            <div class="card-title">${p.title}</div>
+                            <div class="price-box">
+                                <span class="price">${p.price || ''}</span>
+                                ${p.old_price ? `<span class="old-price">${p.old_price}</span>` : ''}
+                            </div>
+                        </div>
+                        <a href="${p.contact_url || '#'}" target="_blank" class="btn-contact">💬 Aloqaga Chiqish</a>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function setCat(cat, el) {
+            currentCat = cat;
+            document.querySelectorAll('.cat-pill').forEach(c => c.classList.remove('active'));
+            el.classList.add('active');
+            renderProducts(allProducts);
+        }
+
+        function filterProducts() { renderProducts(allProducts); }
+
+        async function submitProduct() {
+            let title = document.getElementById('pTitle').value.trim();
+            let desc = document.getElementById('pDesc').value.trim();
+            let msg = document.getElementById('addMsg');
+
+            if (!title || !desc) {
+                msg.style.color = 'red'; msg.innerText = 'Sarlavha va tavsifni to\'ldiring!'; return;
+            }
+
+            let fd = new FormData();
+            fd.append("user_id", userId);
+            fd.append("category", document.getElementById('pCat').value);
+            fd.append("title", title);
+            fd.append("description", desc);
+            fd.append("price", document.getElementById('pPrice').value);
+            fd.append("old_price", document.getElementById('pOldPrice').value);
+            fd.append("contact_url", document.getElementById('pContact').value);
+            let img = document.getElementById('pImage').files[0];
+            if (img) fd.append("image", img);
+
+            msg.style.color = 'blue'; msg.innerText = 'Joylanmoqda...';
+
+            let res = await fetch('/api/add_product', { method: 'POST', body: fd });
+            let data = await res.json();
+            msg.style.color = data.success ? 'green' : 'red';
+            msg.innerText = data.message;
+
+            if (data.success) {
+                document.getElementById('pTitle').value = '';
+                document.getElementById('pDesc').value = '';
+                document.getElementById('pImage').value = '';
+                setTimeout(() => nav('feed'), 1000);
+            }
+        }
+
+        async function loadAdminProducts() {
+            let res = await fetch('/api/products');
+            let products = await res.json();
+            let container = document.getElementById('adminProdList');
+            container.innerHTML = '';
+
+            products.forEach(p => {
+                let div = document.createElement('div');
+                div.className = 'admin-item';
+                div.innerHTML = `
+                    <div><strong>${p.title}</strong><br><span style="color:var(--text-muted); font-size:10px;">${p.category}</span></div>
+                    <button class="btn-del" onclick="deleteProduct(${p.id})">O'chirish</button>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        async function deleteProduct(id) {
+            if (!confirm("Ushbu e'lonni o'chirmoqchimisiz?")) return;
+            let fd = new URLSearchParams();
+            fd.append("product_id", id);
+            fd.append("user_id", userId);
+            let res = await fetch('/api/delete_product', { method: 'POST', body: fd });
+            let data = await res.json();
+            if (data.success) loadAdminProducts();
+        }
+
+        async function addAdmin() {
+            let uname = document.getElementById('adminUsername').value.trim();
+            let msg = document.getElementById('adminMsg');
+            if (!uname) { msg.style.color = 'red'; msg.innerText = 'Usernameni kiriting!'; return; }
+
+            let fd = new URLSearchParams();
+            fd.append("username", uname);
+            fd.append("user_id", userId);
+
+            let res = await fetch('/api/add_admin', { method: 'POST', body: fd });
+            let data = await res.json();
+            msg.style.color = data.success ? 'green' : 'red';
+            msg.innerText = data.message;
+            if (data.success) document.getElementById('adminUsername').value = '';
+        }
+
+        checkAdminRights();
+        loadProducts();
+    </script>
+</body>
+</html>"""
+
+# --- API ENDPOINLARI ---
 
 @app.get("/", response_class=HTMLResponse)
-async def get_webapp(request: Request):
-    return templates.TemplateResponse(request=request, name="index.html")
+async def index():
+    return HTMLResponse(content=HTML_CONTENT)
 
-@app.get("/api/categories")
-async def get_categories():
-    conn = db.get_db()
-    cats = conn.execute("SELECT * FROM categories").fetchall()
+@app.get("/api/check_admin")
+async def check_admin(user_id: int, username: str = ""):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    
+    clean_uname = username.replace("@", "").strip().lower()
+    c.execute("SELECT telegram_id FROM admins WHERE telegram_id = ? OR LOWER(username) = ?", (user_id, clean_uname))
+    res = c.fetchone()
     conn.close()
-    return JSONResponse([dict(c) for c in cats])
+
+    is_admin = bool(res) or (user_id == OWNER_ID)
+    return {"is_admin": is_admin, "is_owner": (user_id == OWNER_ID)}
 
 @app.get("/api/products")
-async def get_products(
-    category: str = Query("all"),
-    search: str = Query(""),
-    sort: str = Query("new"),
-    status: str = Query("approved"),
-    user_id: Optional[int] = Query(None)
-):
-    conn = db.get_db()
-    
-    if status != "approved" and (not user_id or not db.is_admin(user_id)):
-        return JSONResponse(status_code=403, content={"message": "Ruxsat berilmagan!"})
-
-    query = "SELECT * FROM products WHERE status = ?"
-    params = [status]
-
-    if category != "all":
-        query += " AND category = ?"
-        params.append(category)
-
-    if search:
-        query += " AND (title LIKE ? OR description LIKE ?)"
-        params.extend([f"%{search}%", f"%{search}%"])
-
-    if sort == "cheap":
-        query += " ORDER BY price ASC"
-    elif sort == "expensive":
-        query += " ORDER BY price DESC"
-    else:
-        query += " ORDER BY id DESC"
-
-    products = [dict(row) for row in conn.execute(query, params).fetchall()]
+async def get_products():
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id, user_id, category, title, description, price, old_price, contact_url, image_path FROM products ORDER BY id DESC")
+    rows = c.fetchall()
     conn.close()
-    return JSONResponse(products)
 
-@app.post("/api/products/add")
+    return [{
+        "id": r[0], "user_id": r[1], "category": r[2], "title": r[3],
+        "description": r[4], "price": r[5], "old_price": r[6],
+        "contact_url": r[7], "image_path": r[8]
+    } for r in rows]
+
+@app.post("/api/add_product")
 async def add_product(
-    title: str = Form(...),
-    category: str = Form(...),
-    description: str = Form(...),
-    price: float = Form(...),
-    old_price: float = Form(0),
     user_id: int = Form(...),
-    username: str = Form(""),
-    image: UploadFile = File(...)
+    category: str = Form(...),
+    title: str = Form(...),
+    description: str = Form(...),
+    price: str = Form(None),
+    old_price: str = Form(None),
+    contact_url: str = Form(None),
+    image: UploadFile = File(None)
 ):
-    file_ext = image.filename.split(".")[-1]
-    filename = f"{user_id}_{int(asyncio.get_event_loop().time())}.{file_ext}"
-    path = os.path.join("static/uploads", filename)
-    
-    with open(path, "wb") as buffer:
-        shutil.copyfileobj(image.file, buffer)
+    image_url = None
+    if image and image.filename:
+        ext = image.filename.split(".")[-1]
+        fname = f"{user_id}_{asyncio.get_event_loop().time()}_{os.urandom(3).hex()}.{ext}"
+        fpath = os.path.join("static", "uploads", fname)
+        with open(fpath, "wb") as f:
+            shutil.copyfileobj(image.file, f)
+        image_url = f"/static/uploads/{fname}"
 
-    conn = db.get_db()
-    conn.execute("""
-        INSERT INTO products (title, category, description, price, old_price, image_path, owner_id, owner_username)
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("""
+        INSERT INTO products (user_id, category, title, description, price, old_price, contact_url, image_path)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (title, category, description, price, old_price, f"/static/uploads/{filename}", user_id, username))
+    """, (user_id, category, title, description, price, old_price, contact_url, image_url))
     conn.commit()
     conn.close()
 
-    return JSONResponse({"success": True, "message": "E'lon qilindi! Admin tekshiruvidan so'ng bozorda ko'rinadi."})
+    return {"success": True, "message": "E'lon muvaffaqiyatli qo'shildi!"}
 
-@app.post("/api/admin/moderate")
-async def moderate_product(product_id: int = Form(...), action: str = Form(...), user_id: int = Form(...)):
-    if not db.is_admin(user_id):
-        raise HTTPException(status_code=403, detail="Ruxsat yo'q!")
-    
-    new_status = "approved" if action == "approve" else "rejected"
-    conn = db.get_db()
-    conn.execute("UPDATE products SET status = ? WHERE id = ?", (new_status, product_id))
+@app.post("/api/delete_product")
+async def delete_product(product_id: int = Form(...), user_id: int = Form(...)):
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT telegram_id FROM admins WHERE telegram_id = ?", (user_id,))
+    is_admin = bool(c.fetchone()) or (user_id == OWNER_ID)
+
+    if not is_admin:
+        conn.close()
+        return {"success": False, "message": "Ruxsat yo'q!"}
+
+    c.execute("DELETE FROM products WHERE id = ?", (product_id,))
     conn.commit()
     conn.close()
-    return JSONResponse({"success": True, "message": f"E'lon statusi {new_status} deb o'zgartirildi."})
+    return {"success": True}
 
-@app.post("/api/admin/manage-role")
-async def manage_role(target_id: int = Form(...), new_role: str = Form(...), requester_id: int = Form(...)):
-    if requester_id != db.SUPER_ADMIN_ID:
-        raise HTTPException(status_code=403, detail="Faqat Super Admin (ID: 7686687044) admin tayinlay oladi!")
-    
-    conn = db.get_db()
-    conn.execute("UPDATE users SET role = ? WHERE telegram_id = ?", (new_role, target_id))
-    conn.commit()
-    conn.close()
-    return JSONResponse({"success": True, "message": f"Foydalanuvchi {target_id} ga '{new_role}' roli berildi."})
+@app.post("/api/add_admin")
+async def add_admin(username: str = Form(...), user_id: int = Form(...)):
+    if user_id != OWNER_ID:
+        return {"success": False, "message": "Faqat SuperAdmin yangi admin qo'shishi mumkin!"}
 
-@app.get("/api/user/me")
-async def get_me(user_id: int = Query(...)):
-    conn = db.get_db()
-    user = conn.execute("SELECT * FROM users WHERE telegram_id = ?", (user_id,)).fetchone()
-    conn.close()
-    if not user:
-        return JSONResponse({"role": "user", "is_superadmin": user_id == db.SUPER_ADMIN_ID, "is_admin": user_id == db.SUPER_ADMIN_ID})
-    
-    u_dict = dict(user)
-    u_dict["is_superadmin"] = (user_id == db.SUPER_ADMIN_ID)
-    u_dict["is_admin"] = db.is_admin(user_id)
-    return JSONResponse(u_dict)
+    clean_username = username.replace("@", "").strip().lower()
 
-async def main():
-    import uvicorn
-    db.init_db()
-    config = uvicorn.Config(app, host="0.0.0.0", port=8000)
-    server = uvicorn.Server(config)
-    await asyncio.gather(dp.start_polling(bot), server.serve())
-
-if __name__ == "__main__":
-    asyncio.run(main())
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    try:
+        c.execute("INSERT INTO admins (username) VALUES (?)", (clean_username,))
+        conn.commit()
+        conn.close()
+        return {"success": True, "message": f"@{clean_username} admin qilindi!"}
+    except sqlite3.IntegrityError:
+        conn.close()
+        return {"success": False, "message": "Bu foydalanuvchi allaqachon admin!"}
