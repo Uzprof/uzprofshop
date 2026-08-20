@@ -9,171 +9,352 @@ from fastapi.staticfiles import StaticFiles
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 
-# --- SOZLAMALAR ---
-BOT_TOKEN = "8784665419:AAFeTyDY1eiA9jWuG_smi4Ag2wGA3VSDiQ"  # O'z tokeningizni yozing
+# --- SOZLAMALAR VA ID'LAR ---
+BOT_TOKEN = "8784665419:AAE8dF85EpYIA4vWX_5CTP30jzumqIUfREg"  # O'z bot tokeningizni yozing
 DOMAIN = "https://uzprofshop.onrender.com"
 DB_PATH = "uzprof.db"
+
 OWNER_ID = 7686687044
-ADMIN_ID = 8564001612
+ADMIN_ID = 7875662532
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 os.makedirs("static/uploads", exist_ok=True)
 
-# --- UZUM MARKET 1:1 USLUBIDAGI PROFESSIONAL INTERFAYS ---
+# --- ZAMONAVIY VA CHIROYLI INTERFAYS (HTML/CSS/JS) ---
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Uzprof.shop - Onlayn Bozor</title>
+    <title>Uzprof.shop - Raqamli Bozor</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         :root {
-            --uzum-blue: #007bff;
-            --uzum-blue-hover: #0056b3;
-            --bg-light: #f4f5f7;
-            --text-main: #1f2022;
-            --text-secondary: #8b8e98;
-            --border-color: #e0e0e0;
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
+            --card-bg: rgba(255, 255, 255, 0.07);
+            --border-glass: rgba(255, 255, 255, 0.12);
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
         }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-light); color: var(--text-main); margin: 0; padding: 0; }
         
-        /* Top Navigation Bar */
-        .top-nav { background: #fff; border-bottom: 1px solid var(--border-color); padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-secondary); }
-        .top-nav-left { display: flex; gap: 15px; }
-        
-        /* Main Header */
-        .main-header { background: #fff; padding: 12px 16px; display: flex; align-items: center; gap: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.02); position: sticky; top: 0; z-index: 100; }
-        .logo { font-size: 20px; font-weight: 800; color: var(--uzum-blue); text-decoration: none; display: flex; align-items: center; gap: 6px; }
-        .catalog-btn { background: #eef2ff; color: var(--uzum-blue); border: none; padding: 10px 16px; border-radius: 8px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 8px; }
-        .search-bar { flex: 1; display: flex; border: 2px solid var(--uzum-blue); border-radius: 10px; overflow: hidden; background: #fff; }
-        .search-bar input { flex: 1; border: none; padding: 10px 14px; outline: none; font-size: 14px; }
-        .search-bar button { background: var(--uzum-blue); color: #fff; border: none; padding: 0 16px; cursor: pointer; font-weight: bold; }
-        
-        /* Categories Ribbon */
-        .categories-ribbon { background: #fff; padding: 10px 16px; display: flex; gap: 10px; overflow-x: auto; border-bottom: 1px solid var(--border-color); white-space: nowrap; }
-        .cat-pill { background: #f4f5f7; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text-main); transition: 0.2s; }
-        .cat-pill:hover, .cat-pill.active { background: var(--uzum-blue); color: #fff; }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-gradient);
+            color: var(--text-main);
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
 
-        /* Container & Tabs */
-        .container { max-width: 1200px; margin: 20px auto; padding: 0 16px; }
-        .nav-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-        .tab-btn { background: #fff; border: 1px solid var(--border-color); padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 600; color: var(--text-secondary); }
-        .tab-btn.active { background: var(--uzum-blue); color: #fff; border-color: var(--uzum-blue); }
+        .app-container {
+            max-width: 480px;
+            margin: 0 auto;
+            padding: 20px 16px 80px 16px;
+        }
 
-        /* Product Grid */
-        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px; }
-        .product-card { background: #fff; border-radius: 12px; padding: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); display: flex; flex-direction: column; position: relative; }
-        .product-card img { width: 100%; height: 160px; object-fit: cover; border-radius: 8px; background: #eee; }
-        .product-title { font-size: 14px; font-weight: 600; margin: 10px 0 5px 0; color: var(--text-main); }
-        .product-desc { font-size: 12px; color: var(--text-secondary); flex: 1; margin-bottom: 10px; }
-        .product-price { font-size: 16px; font-weight: bold; color: var(--uzum-blue); }
-        
-        /* Forms & Admin Panel */
-        .form-box, .admin-box { background: #fff; padding: 25px; border-radius: 12px; max-width: 600px; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-        input, select, textarea { width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; box-sizing: border-box; font-size: 14px; }
-        .btn-primary { width: 100%; background: var(--uzum-blue); color: #fff; border: none; padding: 14px; border-radius: 8px; font-size: 15px; font-weight: bold; cursor: pointer; }
-        .btn-primary:hover { background: var(--uzum-blue-hover); }
-        
-        .admin-list-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; align-items: center; }
-        .badge { background: #eef2ff; color: var(--uzum-blue); padding: 4px 8px; border-radius: 6px; font-size: 11px; font-weight: bold; }
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-glass);
+            padding: 14px 18px;
+            border-radius: 16px;
+        }
+        .logo {
+            font-size: 18px;
+            font-weight: 800;
+            background: linear-gradient(90deg, #818cf8, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .user-badge {
+            font-size: 11px;
+            background: rgba(99, 102, 241, 0.2);
+            color: #818cf8;
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        /* Search & Menu */
+        .search-box {
+            position: relative;
+            margin-bottom: 15px;
+        }
+        .search-box input {
+            width: 100%;
+            padding: 12px 16px 12px 42px;
+            background: var(--card-bg);
+            border: 1px solid var(--border-glass);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 14px;
+            outline: none;
+            box-sizing: border-box;
+            transition: 0.2s;
+        }
+        .search-box input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+        .search-icon {
+            position: absolute;
+            left: 14px;
+            top: 14px;
+            color: var(--text-muted);
+        }
+
+        /* Categories Menu */
+        .menu-scroll {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 5px;
+            margin-bottom: 20px;
+            scrollbar-width: none;
+        }
+        .menu-scroll::-webkit-scrollbar { display: none; }
+        .menu-pill {
+            background: var(--card-bg);
+            border: 1px solid var(--border-glass);
+            color: var(--text-muted);
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .menu-pill.active {
+            background: var(--primary);
+            color: #fff;
+            border-color: var(--primary);
+        }
+
+        /* Bottom Nav Tabs */
+        .nav-tabs {
+            display: flex;
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-glass);
+            padding: 6px;
+            border-radius: 14px;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: 0.2s;
+            text-align: center;
+        }
+        .tab-btn.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+        }
+
+        /* Product Cards Grid */
+        .product-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: transform 0.2s;
+        }
+        .card img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            background: #1e293b;
+        }
+        .card-body {
+            padding: 16px;
+        }
+        .card-cat {
+            font-size: 11px;
+            color: var(--accent);
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+        .card-title {
+            font-size: 16px;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            color: #fff;
+        }
+        .card-desc {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin: 0;
+            line-height: 1.4;
+        }
+
+        /* Forms (Add & Admin) */
+        .form-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-glass);
+            padding: 20px;
+            border-radius: 16px;
+        }
+        .form-group {
+            margin-bottom: 14px;
+        }
+        label {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 12px;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid var(--border-glass);
+            border-radius: 10px;
+            color: #fff;
+            font-size: 14px;
+            box-sizing: border-box;
+            outline: none;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: var(--primary);
+        }
+        .btn-submit {
+            width: 100%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .btn-submit:hover { background: var(--primary-hover); }
+
+        .admin-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0,0,0,0.2);
+            padding: 10px 14px;
+            border-radius: 10px;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        .delete-btn {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
 
-    <!-- Top Navigation -->
-    <div class="top-nav">
-        <div class="top-nav-left">
-            <span>📍 Toshkent</span>
-            <span>Topshirish punktlari</span>
-            <span>Sotuvchi bo'lish</span>
+    <div class="app-container">
+        <!-- Header -->
+        <div class="header">
+            <div class="logo">⚡ Uzprof.shop</div>
+            <div class="user-badge" id="userBadge">ID: yuklanmoqda...</div>
         </div>
-        <div id="user-info-badge" style="font-weight: bold; color: var(--uzum-blue);">ID aniqlanmoqda...</div>
-    </div>
 
-    <!-- Main Header -->
-    <div class="main-header">
-        <a href="#" class="logo">🛍️ Uzprof.shop</a>
-        <button class="catalog-btn">☰ Katalog</button>
-        <div class="search-bar">
-            <input type="text" id="searchInput" placeholder="Mahsulotlar va xizmatlarni izlash...">
-            <button>Qidirish</button>
-        </div>
-    </div>
-
-    <!-- Categories Ribbon -->
-    <div class="categories-ribbon">
-        <div class="cat-pill active" onclick="filterCat('Barchasi')">🔥 Barchasi</div>
-        <div class="cat-pill" onclick="filterCat('Dasturlash va Botlar')">💻 Dasturlash va Botlar</div>
-        <div class="cat-pill" onclick="filterCat('Telegram Stars')">⭐ Telegram Stars</div>
-        <div class="cat-pill" onclick="filterCat('Sovgora va Giftlar')">🎁 Sovg'alar</div>
-        <div class="cat-pill" onclick="filterCat('Professional Xizmatlar')">🛠️ Xizmatlar</div>
-    </div>
-
-    <div class="container">
         <!-- Navigation Tabs -->
         <div class="nav-tabs">
-            <button class="tab-btn active" onclick="switchTab('market')" id="tabMarket">📦 Mahsulotlar</button>
+            <button class="tab-btn active" onclick="switchTab('feed')" id="tabFeed">📦 E'lonlar</button>
             <button class="tab-btn" onclick="switchTab('add')" id="tabAdd">➕ E'lon berish</button>
-            <button class="tab-btn" onclick="switchTab('admin')" id="tabAdmin" style="display:none;">⚙️ Admin Panel</button>
+            <button class="tab-btn" onclick="switchTab('admin')" id="tabAdmin" style="display:none;">⚙️ Admin</button>
         </div>
 
-        <!-- Marketplace View -->
-        <div id="sectionMarket">
+        <!-- Feed Section -->
+        <div id="sectionFeed">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="Xizmat yoki mahsulotlarni qidirish..." oninput="filterProducts()">
+            </div>
+
+            <!-- Categories Menu -->
+            <div class="menu-scroll" id="menuScroll">
+                <div class="menu-pill active" onclick="selectCategory('Barchasi', this)">🔥 Barchasi</div>
+                <div class="menu-pill" onclick="selectCategory('Telegram Botlar', this)">🤖 Telegram Botlar</div>
+                <div class="menu-pill" onclick="selectCategory('Web Dasturlash', this)">💻 Web Dasturlash</div>
+                <div class="menu-pill" onclick="selectCategory('Skriptlar va Kodlar', this)">📜 Skriptlar</div>
+                <div class="menu-pill" onclick="selectCategory('Dizayn va Grafika', this)">🎨 Dizayn</div>
+            </div>
+
             <div class="product-grid" id="productGrid">
-                <!-- Mahsulotlar shu yerga yuklanadi -->
+                <!-- E'lonlar shu yerga tushadi -->
             </div>
         </div>
 
-        <!-- Add Product View -->
+        <!-- Add Product Section -->
         <div id="sectionAdd" style="display:none;">
-            <div class="form-box">
-                <h2>Xizmat yoki Mahsulot Joylash</h2>
+            <div class="form-card">
+                <h3 style="margin-top:0; color:#fff;">Yangi E'lon Qo'shish</h3>
                 <div class="form-group">
                     <label>Kategoriya</label>
-                    <select id="prodCat">
-                        <option value="Dasturlash va Botlar">💻 Dasturlash va Botlar</option>
-                        <option value="Telegram Stars">⭐ Telegram Stars</option>
-                        <option value="Sovgora va Giftlar">🎁 Sovg'alar va Giftlar</option>
-                        <option value="Professional Xizmatlar">🛠️ Professional Xizmatlar</option>
+                    <select id="pCat">
+                        <option value="Telegram Botlar">🤖 Telegram Botlar</option>
+                        <option value="Web Dasturlash">💻 Web Dasturlash</option>
+                        <option value="Skriptlar va Kodlar">📜 Skriptlar va Kodlar</option>
+                        <option value="Dizayn va Grafika">🎨 Dizayn va Grafika</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Nomi</label>
-                    <input type="text" id="prodTitle" placeholder="Masalan: Telegram bot yaratish">
+                    <label>Sarlavha (Nomi)</label>
+                    <input type="text" id="pTitle" placeholder="Masalan: Professional Telegram bot">
                 </div>
                 <div class="form-group">
-                    <label>Tavsif va Narxi</label>
-                    <textarea id="prodDesc" rows="3" placeholder="Narxi, shartlari va batafsil..."></textarea>
+                    <label>Batafsil tavsif va narxi</label>
+                    <textarea id="pDesc" rows="3" placeholder="Narxi, imkoniyatlari va shartlari..."></textarea>
                 </div>
                 <div class="form-group">
-                    <label>Rasm yuklash</label>
-                    <input type="file" id="prodImage" accept="image/*">
+                    <label>Mahsulot/Xizmat rasmi</label>
+                    <input type="file" id="pImage" accept="image/*">
                 </div>
-                <button class="btn-primary" onclick="submitProduct()">E'lonni joylash</button>
-                <p id="addMsg" style="text-align:center; margin-top:10px; font-weight:600;"></p>
+                <button class="btn-submit" onclick="submitProduct()">🚀 E'lonni Jo'natish</button>
+                <p id="formMsg" style="text-align:center; font-size:13px; margin-top:10px; font-weight:600;"></p>
             </div>
         </div>
 
-        <!-- Admin Panel View -->
+        <!-- Admin Panel Section -->
         <div id="sectionAdmin" style="display:none;">
-            <div class="admin-box">
-                <h2>Admin Boshqaruvi</h2>
-                <p>Username orqali yangi admin qo'shish (masalan: <b>@username</b>)</p>
-                <div class="form-group">
-                    <input type="text" id="newAdminUsername" placeholder="@admin_username">
-                </div>
-                <button class="btn-primary" onclick="addNewAdmin()">Admin qo'shish</button>
-                <p id="adminMsg" style="text-align:center; margin-top:10px; font-weight:600;"></p>
-                
-                <hr style="margin: 25px 0; border:0; border-top:1px solid #eee;">
-                <h3>Mavjud Adminlar</h3>
-                <div id="adminListContainer">
-                    <!-- Adminlar ro'yxati -->
+            <div class="form-card">
+                <h3 style="margin-top:0; color:#fff;">Admin Boshqaruvi</h3>
+                <p style="font-size:12px; color:var(--text-muted);">Barcha e'lonlarni boshqarish va o'chirish.</p>
+                <div id="adminProductList">
+                    <!-- Admin mahsulotlari -->
                 </div>
             </div>
         </div>
@@ -182,119 +363,143 @@ HTML_CONTENT = """<!DOCTYPE html>
     <script>
         let tg = window.Telegram.WebApp;
         tg.expand();
-        let user = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user : {id: 7686687044, username: "owner"};
         
-        document.getElementById('user-info-badge').innerText = `ID: ${user.id} (@${user.username || 'user'})`;
+        let user = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user : { id: 7686687044, first_name: "Owner" };
+        document.getElementById('userBadge').innerText = `ID: ${user.id}`;
 
-        // Tekshirish: Adminmi?
-        checkAdminStatus();
-
-        async function checkAdminStatus() {
-            let res = await fetch(`/api/check_admin?user_id=${user.id}&username=${user.username || ''}`);
-            let data = await res.json();
-            if (data.is_admin) {
-                document.getElementById('tabAdmin').style.display = 'block';
-                loadAdminList();
-            }
+        // Admin ekanligini tekshirish (Owner: 7686687044, Admin: 7875662532)
+        const ADMINS = [7686687044, 7875662532];
+        if (ADMINS.includes(user.id)) {
+            document.getElementById('tabAdmin').style.display = 'block';
         }
 
+        let currentCategory = 'Barchasi';
+        let allProducts = [];
+
         function switchTab(tab) {
-            document.getElementById('sectionMarket').style.display = tab === 'market' ? 'block' : 'none';
+            document.getElementById('sectionFeed').style.display = tab === 'feed' ? 'block' : 'none';
             document.getElementById('sectionAdd').style.display = tab === 'add' ? 'block' : 'none';
             document.getElementById('sectionAdmin').style.display = tab === 'admin' ? 'block' : 'none';
             
-            document.getElementById('tabMarket').classList.toggle('active', tab === 'market');
+            document.getElementById('tabFeed').classList.toggle('active', tab === 'feed');
             document.getElementById('tabAdd').classList.toggle('active', tab === 'add');
             document.getElementById('tabAdmin').classList.toggle('active', tab === 'admin');
 
-            if (tab === 'market') loadProducts();
+            if (tab === 'feed') loadProducts();
+            if (tab === 'admin') loadAdminProducts();
         }
 
-        async function loadProducts(category = 'Barchasi') {
-            let res = await fetch(`/api/products?cat=${encodeURIComponent(category)}`);
-            let products = await res.json();
+        async function loadProducts() {
+            let res = await fetch('/api/products');
+            allProducts = await res.json();
+            renderProducts(allProducts);
+        }
+
+        function renderProducts(products) {
             let grid = document.getElementById('productGrid');
             grid.innerHTML = '';
+
+            let query = document.getElementById('searchInput').value.toLowerCase();
             
-            if (products.length === 0) {
-                grid.innerHTML = '<p style="grid-column: 1/-1; text-align:center; color:#8b8e98;">Hozircha e\'lonlar mavjud emas.</p>';
+            let filtered = products.filter(p => {
+                let matchesCat = (currentCategory === 'Barchasi' || p.category === currentCategory);
+                let matchesSearch = p.title.toLowerCase().includes(query) || p.description.toLowerCase().includes(query);
+                return matchesCat && matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = '<p style="text-align:center; color:var(--text-muted); font-size:13px;">E\'lonlar topilmadi.</p>';
                 return;
             }
 
-            products.forEach(p => {
+            filtered.forEach(p => {
                 let card = document.createElement('div');
-                card.className = 'product-card';
+                card.className = 'card';
                 card.innerHTML = `
-                    <img src="${p.image_path ? p.image_path : 'https://via.placeholder.com/200'}" alt="Product">
-                    <div class="product-title">${p.title}</div>
-                    <div class="product-desc">${p.description}</div>
-                    <div class="product-price">${p.category}</div>
+                    ${p.image_path ? `<img src="${p.image_path}" alt="img">` : ''}
+                    <div class="card-body">
+                        <div class="card-cat">${p.category}</div>
+                        <div class="card-title">${p.title}</div>
+                        <div class="card-desc">${p.description}</div>
+                    </div>
                 `;
                 grid.appendChild(card);
             });
         }
 
-        function filterCat(cat) {
-            document.querySelectorAll('.cat-pill').forEach(p => p.classList.remove('active'));
-            event.target.classList.add('active');
-            loadProducts(cat);
+        function selectCategory(cat, el) {
+            currentCategory = cat;
+            document.querySelectorAll('.menu-pill').forEach(p => p.classList.remove('active'));
+            el.classList.add('active');
+            renderProducts(allProducts);
+        }
+
+        function filterProducts() {
+            renderProducts(allProducts);
         }
 
         async function submitProduct() {
             let fd = new FormData();
             fd.append("user_id", user.id);
-            fd.append("username", user.username || "");
-            fd.append("category", document.getElementById('prodCat').value);
-            fd.append("title", document.getElementById('prodTitle').value);
-            fd.append("description", document.getElementById('prodDesc').value);
-            let img = document.getElementById('prodImage').files[0];
+            fd.append("category", document.getElementById('pCat').value);
+            fd.append("title", document.getElementById('pTitle').value);
+            fd.append("description", document.getElementById('pDesc').value);
+            let img = document.getElementById('pImage').files[0];
             if (img) fd.append("image", img);
 
             let res = await fetch('/api/add_product', { method: 'POST', body: fd });
             let data = await res.json();
-            let msg = document.getElementById('addMsg');
-            msg.style.color = data.success ? 'green' : 'red';
+            let msg = document.getElementById('formMsg');
+            msg.style.color = data.success ? '#38bdf8' : '#ef4444';
             msg.innerText = data.message;
+
             if (data.success) {
-                document.getElementById('prodTitle').value = '';
-                document.getElementById('prodDesc').value = '';
-                document.getElementById('prodImage').value = '';
-                setTimeout(() => switchTab('market'), 1500);
+                document.getElementById('pTitle').value = '';
+                document.getElementById('pDesc').value = '';
+                document.getElementById('pImage').value = '';
+                setTimeout(() => switchTab('feed'), 1200);
             }
         }
 
-        async function addNewAdmin() {
-            let uname = document.getElementById('newAdminUsername').value.trim();
-            if (!uname) { alert("Username kiriting!"); return; }
-            
-            let fd = new URLSearchParams();
-            fd.append("username", uname);
-            let res = await fetch('/api/add_admin', { method: 'POST', body: fd });
-            let data = await res.json();
-            
-            let msg = document.getElementById('adminMsg');
-            msg.style.color = data.success ? 'green' : 'red';
-            msg.innerText = data.message;
-            if (data.success) {
-                document.getElementById('newAdminUsername').value = '';
-                loadAdminList();
-            }
-        }
-
-        async function loadAdminList() {
-            let res = await fetch('/api/admins');
-            let admins = await res.json();
-            let container = document.getElementById('adminListContainer');
+        async function loadAdminProducts() {
+            let res = await fetch('/api/products');
+            let products = await res.json();
+            let container = document.getElementById('adminProductList');
             container.innerHTML = '';
-            admins.forEach(a => {
-                let div = document.createElement('div');
-                div.className = 'admin-list-item';
-                div.innerHTML = `<span>@${a}</span> <span class="badge">Admin</span>`;
-                container.appendChild(div);
+
+            if (products.length === 0) {
+                container.innerHTML = '<p style="color:var(--text-muted); font-size:13px;">Hozircha e\'lonlar yo\'q.</p>';
+                return;
+            }
+
+            products.forEach(p => {
+                let item = document.createElement('div');
+                item.className = 'admin-item';
+                item.innerHTML = `
+                    <div>
+                        <strong style="color:#fff;">${p.title}</strong><br>
+                        <span style="font-size:11px; color:var(--text-muted);">${p.category}</span>
+                    </div>
+                    <button class="delete-btn" onclick="deleteProduct(${p.id})">O'chirish</button>
+                `;
+                container.appendChild(item);
             });
         }
 
-        // Boshlang'ich yuklash
+        async function deleteProduct(id) {
+            if (!confirm("Rostdan ham bu e'lonni o'chirmoqchimisiz?")) return;
+            let fd = new URLSearchParams();
+            fd.append("product_id", id);
+            fd.append("user_id", user.id);
+            let res = await fetch('/api/delete_product', { method: 'POST', body: fd });
+            let data = await res.json();
+            if (data.success) {
+                loadAdminProducts();
+            } else {
+                alert(data.message);
+            }
+        }
+
         loadProducts();
     </script>
 </body>
@@ -305,48 +510,23 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
-        CREATE TABLE IF NOT EXISTS admins (
-            username TEXT PRIMARY KEY
-        )
-    """)
-    c.execute("""
         CREATE TABLE IF NOT EXISTS products (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,
-            username TEXT,
             category TEXT,
             title TEXT,
             description TEXT,
-            image_path TEXT,
-            status TEXT DEFAULT 'approved'
+            image_path TEXT
         )
     """)
-    # Owner va Admin username/ID larini kiritish
-    c.execute("INSERT OR IGNORE INTO admins (username) VALUES ('owner_uzprof')")
-    c.execute("INSERT OR IGNORE INTO admins (username) VALUES ('admin_uzprof')")
     conn.commit()
     conn.close()
-
-def is_admin_user(user_id: int, username: str) -> bool:
-    if user_id in [OWNER_ID, ADMIN_ID]:
-        return True
-    if not username:
-        return False
-    
-    clean_uname = username.lstrip('@').lower()
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT 1 FROM admins WHERE LOWER(username) = ?", (clean_uname,))
-    res = c.fetchone()
-    conn.close()
-    return res is not None
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
-    webhook_url = f"{DOMAIN}/webhook"
     try:
-        await bot.set_webhook(webhook_url)
+        await bot.set_webhook(f"{DOMAIN}/webhook")
     except:
         pass
     yield
@@ -364,13 +544,10 @@ async def index():
     return HTMLResponse(content=HTML_CONTENT)
 
 @app.get("/api/products")
-async def get_products(cat: str = "Barchasi"):
+async def get_products():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    if cat == "Barchasi":
-        c.execute("SELECT id, user_id, category, title, description, image_path FROM products ORDER BY id DESC")
-    else:
-        c.execute("SELECT id, user_id, category, title, description, image_path FROM products WHERE category = ? ORDER BY id DESC", (cat,))
+    c.execute("SELECT id, user_id, category, title, description, image_path FROM products ORDER BY id DESC")
     rows = c.fetchall()
     conn.close()
     
@@ -389,7 +566,6 @@ async def get_products(cat: str = "Barchasi"):
 @app.post("/api/add_product")
 async def add_product(
     user_id: int = Form(...),
-    username: str = Form(""),
     category: str = Form(...),
     title: str = Form(...),
     description: str = Form(...),
@@ -407,14 +583,14 @@ async def add_product(
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute(
-        "INSERT INTO products (user_id, username, category, title, description, image_path) VALUES (?, ?, ?, ?, ?, ?)",
-        (user_id, username, category, title, description, image_url)
+        "INSERT INTO products (user_id, category, title, description, image_path) VALUES (?, ?, ?, ?, ?)",
+        (user_id, category, title, description, image_url)
     )
     conn.commit()
     conn.close()
 
     # Adminlarga xabar yuborish
-    notif = f"📦 **Yangi e'lon!**\n\n🏷️ Kategoriya: {category}\n📝 Nomi: {title}\n📄 Tavsif: {description}\n👤 Foydalanuvchi: @{username or 'Nomaʼlum'}"
+    notif = f"📦 **Yangi raqamiy e'lon!**\n\n🏷️ Kategoriya: {category}\n📝 Nomi: {title}\n📄 Tavsif: {description}\n👤 User ID: {user_id}"
     for admin in [OWNER_ID, ADMIN_ID]:
         try:
             if image_url:
@@ -424,35 +600,19 @@ async def add_product(
         except:
             pass
 
-    return {"success": True, "message": "✅ E'loningiz muvaffaqiyatli qo'shildi!"}
+    return {"success": True, "message": "✅ E'loningiz muvaffaqiyatli joylandi!"}
 
-@app.get("/api/check_admin")
-async def check_admin(user_id: int, username: str = ""):
-    is_adm = is_admin_user(user_id, username)
-    return {"is_admin": is_adm}
-
-@app.post("/api/add_admin")
-async def add_admin(username: str = Form(...)):
-    clean_uname = username.lstrip('@').lower()
+@app.post("/api/delete_product")
+async def delete_product(product_id: int = Form(...), user_id: int = Form(...)):
+    if user_id not in [OWNER_ID, ADMIN_ID]:
+        return {"success": False, "message": "Sizda bu huquq yo'q!"}
+    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    try:
-        c.execute("INSERT OR IGNORE INTO admins (username) VALUES (?)", (clean_uname,))
-        conn.commit()
-        return {"success": True, "message": f"@{clean_uname} muvaffaqiyatli admin qilindi!"}
-    except Exception as e:
-        return {"success": False, "message": str(e)}
-    finally:
-        conn.close()
-
-@app.get("/api/admins")
-async def get_admins():
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT username FROM admins")
-    rows = c.fetchall()
+    c.execute("DELETE FROM products WHERE id = ?", (product_id,))
+    conn.commit()
     conn.close()
-    return [r[0] for r in rows]
+    return {"success": True}
 
 @app.post("/webhook")
 async def webhook(req: Request):
@@ -461,4 +621,4 @@ async def webhook(req: Request):
 
 @dp.message(Command("start"))
 async def start(msg: types.Message):
-    await msg.answer("🛍️ **Uzprof.shop** ga xush kelibsiz!\n\nVeb-ilovaga kirib o'z mahsulot va xizmatlaringizni joylashingiz mumkin.")
+    await msg.answer("⚡ **Uzprof.shop** — Raqamli xizmatlar va mahsulotlar bozoriga xush kelibsiz!\n\nVeb-ilovaga kirib o'z xizmatlaringizni e'lon qilishingiz mumkin.")
