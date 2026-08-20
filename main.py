@@ -9,26 +9,24 @@ from aiogram.filters import Command
 
 import database as db
 
-BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"  # @BotFather bergan token
-DOMAIN = "https://YOUR_NGROK_URL.ngrok-free.app"
+BOT_TOKEN = "8784665419:AAFeTYdY1eiA9jWu_G_smi4Ag2wGA3VSDiQ"
+DOMAIN = "http://localhost:8000"
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
-app = FastAPI(title="Uzprof.shop - Uzum Market Style API")
+app = FastAPI(title="Uzprof.shop API")
 
 os.makedirs("static/uploads", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# --- BOT LOGIKASI ---
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
-    # Userni bazaga yozish
     conn = db.get_db()
-    conn.execute('''
+    conn.execute("""
         INSERT INTO users (telegram_id, username, full_name)
         VALUES (?, ?, ?) ON CONFLICT(telegram_id) DO UPDATE SET username=?, full_name=?
-    ''', (message.from_user.id, message.from_user.username, message.from_user.full_name,
+    """, (message.from_user.id, message.from_user.username, message.from_user.full_name,
           message.from_user.username, message.from_user.full_name))
     conn.commit()
     conn.close()
@@ -40,13 +38,10 @@ async def start_cmd(message: types.Message):
     )
     await message.answer(f"Xush kelibsiz, {message.from_user.first_name}!\nUzprof.shop milliy bozorida xarid qiling yoki e'lon joylang.", reply_markup=kb)
 
-# --- WEB API ENDPOINTLARI ---
-
 @app.get("/", response_class=HTMLResponse)
 async def get_webapp(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request=request, name="index.html")
 
-# 1. Kategoriyalarni olish
 @app.get("/api/categories")
 async def get_categories():
     conn = db.get_db()
@@ -54,12 +49,11 @@ async def get_categories():
     conn.close()
     return JSONResponse([dict(c) for c in cats])
 
-# 2. Mahsulotlar ro'yxati (Filtr, Sort va Qidiruv)
 @app.get("/api/products")
 async def get_products(
     category: str = Query("all"),
     search: str = Query(""),
-    sort: str = Query("new"), # new, cheap, expensive
+    sort: str = Query("new"),
     status: str = Query("approved"),
     user_id: Optional[int] = Query(None)
 ):
@@ -90,7 +84,6 @@ async def get_products(
     conn.close()
     return JSONResponse(products)
 
-# 3. E'lon qo'shish
 @app.post("/api/products/add")
 async def add_product(
     title: str = Form(...),
@@ -110,16 +103,15 @@ async def add_product(
         shutil.copyfileobj(image.file, buffer)
 
     conn = db.get_db()
-    conn.execute('''
+    conn.execute("""
         INSERT INTO products (title, category, description, price, old_price, image_path, owner_id, owner_username)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (title, category, description, price, old_price, f"/static/uploads/{filename}", user_id, username))
+    """, (title, category, description, price, old_price, f"/static/uploads/{filename}", user_id, username))
     conn.commit()
     conn.close()
 
     return JSONResponse({"success": True, "message": "E'lon qilindi! Admin tekshiruvidan so'ng bozorda ko'rinadi."})
 
-# 4. Moderatsiya (Adminlar va Superadmin 7686687044 uchun)
 @app.post("/api/admin/moderate")
 async def moderate_product(product_id: int = Form(...), action: str = Form(...), user_id: int = Form(...)):
     if not db.is_admin(user_id):
@@ -130,28 +122,26 @@ async def moderate_product(product_id: int = Form(...), action: str = Form(...),
     conn.execute("UPDATE products SET status = ? WHERE id = ?", (new_status, product_id))
     conn.commit()
     conn.close()
-    return JSONResponse({"success": True, "message": f"E'lon {new_status} qilindi."})
+    return JSONResponse({"success": True, "message": f"E'lon statusi {new_status} deb o'zgartirildi."})
 
-# 5. Super Admin (7686687044) tomonidan Admin tayinlash / O'chirish
 @app.post("/api/admin/manage-role")
 async def manage_role(target_id: int = Form(...), new_role: str = Form(...), requester_id: int = Form(...)):
     if requester_id != db.SUPER_ADMIN_ID:
-        raise HTTPException(status_code=403, detail="Faqat Asosiy Super Admin (ID: 7686687044) admin tayinlay oladi!")
+        raise HTTPException(status_code=403, detail="Faqat Super Admin (ID: 7686687044) admin tayinlay oladi!")
     
     conn = db.get_db()
     conn.execute("UPDATE users SET role = ? WHERE telegram_id = ?", (new_role, target_id))
     conn.commit()
     conn.close()
-    return JSONResponse({"success": True, "message": f"Foydalanuvchi {target_id} uchun rol '{new_role}' ga o'zgartirildi."})
+    return JSONResponse({"success": True, "message": f"Foydalanuvchi {target_id} ga '{new_role}' roli berildi."})
 
-# 6. User Profil & Role Tekshirish
 @app.get("/api/user/me")
 async def get_me(user_id: int = Query(...)):
     conn = db.get_db()
     user = conn.execute("SELECT * FROM users WHERE telegram_id = ?", (user_id,)).fetchone()
     conn.close()
     if not user:
-        return JSONResponse({"role": "user", "is_superadmin": user_id == db.SUPER_ADMIN_ID})
+        return JSONResponse({"role": "user", "is_superadmin": user_id == db.SUPER_ADMIN_ID, "is_admin": user_id == db.SUPER_ADMIN_ID})
     
     u_dict = dict(user)
     u_dict["is_superadmin"] = (user_id == db.SUPER_ADMIN_ID)
