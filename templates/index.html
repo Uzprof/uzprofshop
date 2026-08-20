@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Uzprof.shop - Milliy Marketplace</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        :root {
+            --primary: #7000ff;
+            --primary-dark: #5800cc;
+            --bg: #f2f4f7;
+            --card-bg: #ffffff;
+            --text: #1f2026;
+            --gray: #8b8e99;
+        }
+        * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; padding: 0; }
+        body { background-color: var(--bg); color: var(--text); padding-bottom: 70px; }
+
+        .header { background: var(--card-bg); padding: 12px 16px; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+        .logo { font-size: 20px; font-weight: 800; color: var(--primary); display: flex; align-items: center; justify-content: space-between; }
+        .search-box { margin-top: 8px; display: flex; gap: 8px; }
+        .search-box input { flex: 1; padding: 10px 14px; border: 1px solid #e2e5eb; border-radius: 10px; font-size: 14px; background: #f7f8fa; outline: none; }
+
+        .categories-scroll { display: flex; gap: 8px; overflow-x: auto; padding: 12px 16px; background: var(--card-bg); scrollbar-width: none; }
+        .cat-chip { padding: 6px 14px; background: #f2f4f7; border-radius: 20px; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer; color: var(--text); }
+        .cat-chip.active { background: var(--primary); color: #fff; }
+
+        .container { padding: 12px; }
+        .product-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .product-card { background: var(--card-bg); border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; position: relative; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+        .product-card img { width: 100%; height: 150px; object-fit: cover; }
+        .card-body { padding: 10px; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .title { font-size: 13px; font-weight: 500; line-height: 1.3; height: 34px; overflow: hidden; margin-bottom: 6px; }
+        .price-box { margin-top: 4px; }
+        .price { font-size: 15px; font-weight: 700; color: var(--primary); }
+        .old-price { font-size: 11px; color: var(--gray); text-decoration: line-through; }
+        .buy-btn { width: 100%; margin-top: 8px; padding: 8px; background: var(--primary); color: white; border: none; border-radius: 8px; font-weight: 600; font-size: 12px; cursor: pointer; text-decoration: none; text-align: center; display: block; }
+
+        .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: var(--card-bg); display: flex; justify-around: space-around; padding: 8px 0; border-top: 1px solid #e2e5eb; z-index: 1000; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 10px; color: var(--gray); text-decoration: none; cursor: pointer; }
+        .nav-item.active { color: var(--primary); font-weight: bold; }
+        .nav-item span { font-size: 18px; margin-bottom: 2px; }
+
+        .page { display: none; }
+        .page.active { display: block; }
+
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
+        .submit-btn { width: 100%; padding: 12px; background: var(--primary); color: white; border: none; border-radius: 10px; font-weight: bold; font-size: 15px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="logo">
+            <span>Uzprof.shop</span>
+            <small id="userRoleBadge" style="font-size:10px; background:#f0f0f0; padding:2px 6px; border-radius:4px; color:#333;"></small>
+        </div>
+        <div class="search-box">
+            <input type="text" id="searchInput" placeholder="Mahsulot yoki xizmatlarni qidirish..." oninput="loadProducts()">
+        </div>
+    </div>
+
+    <div class="categories-scroll" id="categoryChips">
+        <div class="cat-chip active" onclick="filterCategory('all', this)">Barchasi</div>
+    </div>
+
+    <div class="container">
+        <!-- 1. MARKET PAGE -->
+        <div id="pageMarket" class="page active">
+            <div class="product-grid" id="productGrid"></div>
+        </div>
+
+        <!-- 2. ADD PRODUCT PAGE -->
+        <div id="pageAdd" class="page">
+            <h3 style="margin-bottom:15px;">Yangi E'lon Joylashtirish</h3>
+            <form id="addForm">
+                <div class="form-group"><label>Sarlavha:</label><input type="text" id="addTitle" required placeholder="Masalan: iPhone 15 Pro Max"></div>
+                <div class="form-group"><label>Kategoriya:</label><select id="addCategory" required></select></div>
+                <div class="form-group"><label>Batafsil Tavsif:</label><textarea id="addDesc" rows="3" required></textarea></div>
+                <div class="form-group"><label>Sotish Narxi (UZS):</label><input type="number" id="addPrice" required></div>
+                <div class="form-group"><label>Eski Narxi (Ixtiyoriy UZS):</label><input type="number" id="addOldPrice" value="0"></div>
+                <div class="form-group"><label>Rasm:</label><input type="file" id="addImage" accept="image/*" required></div>
+                <button type="submit" class="submit-btn">E'lonni Moderatsiyaga Yuborish</button>
+            </form>
+        </div>
+
+        <!-- 3. ADMIN PANEL -->
+        <div id="pageAdmin" class="page">
+            <h3>🛡️ Moderatsiya Paneli</h3>
+            <div id="pendingContainer" style="margin-top:15px;"></div>
+
+            <div id="superAdminBox" style="display:none; margin-top:30px; padding:15px; background:#fff; border-radius:10px; border:1px solid #7000ff;">
+                <h4 style="color:var(--primary)">👑 Super Admin Boshqaruvi (ID: 7686687044)</h4>
+                <p style="font-size:12px; margin-bottom:10px;">Yangi admin tayinlash uchun uning Telegram ID raqamini kiriting:</p>
+                <input type="number" id="targetAdminId" placeholder="Masalan: 12345678" style="width:100%; padding:8px; margin-bottom:8px;">
+                <button onclick="changeRole('admin')" style="width:100%; padding:8px; background:#28a745; color:white; border:none; border-radius:6px; font-weight:bold;">Admin Qilib Tayinlash</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="bottom-nav">
+        <div class="nav-item active" onclick="nav('market', this)"><span>🛍️</span>Bozor</div>
+        <div class="nav-item" onclick="nav('add', this)"><span>➕</span>E'lon Berish</div>
+        <div class="nav-item" id="adminNavBtn" style="display:none;" onclick="nav('admin', this)"><span>🛡️</span>Admin</div>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        const user = tg.initDataUnsafe.user || { id: 7686687044, username: "uzemn" };
+        let selectedCategory = "all";
+        let userProfile = {};
+
+        async function init() {
+            const res = await fetch(`/api/user/me?user_id=${user.id}`);
+            userProfile = await res.json();
+
+            document.getElementById("userRoleBadge").innerText = (userProfile.role || "user").toUpperCase();
+
+            if (userProfile.is_admin) {
+                document.getElementById("adminNavBtn").style.display = "flex";
+            }
+            if (userProfile.is_superadmin) {
+                document.getElementById("superAdminBox").style.display = "block";
+            }
+
+            loadCategories();
+            loadProducts();
+        }
+
+        async function loadCategories() {
+            const res = await fetch("/api/categories");
+            const cats = await res.json();
+            
+            const chipContainer = document.getElementById("categoryChips");
+            const selectContainer = document.getElementById("addCategory");
+            
+            cats.forEach(c => {
+                chipContainer.innerHTML += `<div class="cat-chip" onclick="filterCategory('${c.name}', this)">${c.name}</div>`;
+                selectContainer.innerHTML += `<option value="${c.name}">${c.name}</option>`;
+            });
+        }
+
+        async function loadProducts() {
+            const search = document.getElementById("searchInput").value;
+            const res = await fetch(`/api/products?category=${selectedCategory}&search=${search}&status=approved`);
+            const products = await res.json();
+
+            const grid = document.getElementById("productGrid");
+            grid.innerHTML = "";
+
+            products.forEach(p => {
+                grid.innerHTML += `
+                    <div class="product-card">
+                        <img src="${p.image_path}" alt="${p.title}">
+                        <div class="card-body">
+                            <div>
+                                <div class="title">${p.title}</div>
+                                <div class="price-box">
+                                    <div class="price">${p.price.toLocaleString()} UZS</div>
+                                    ${p.old_price > 0 ? `<div class="old-price">${p.old_price.toLocaleString()} UZS</div>` : ""}
+                                </div>
+                            </div>
+                            <a href="https://t.me/${p.owner_username || ""}" target="_blank" class="buy-btn">💬 Aloqaga Chiqish</a>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function filterCategory(catName, el) {
+            document.querySelectorAll(".cat-chip").forEach(c => c.classList.remove("active"));
+            el.classList.add("active");
+            selectedCategory = catName;
+            loadProducts();
+        }
+
+        function nav(page, el) {
+            document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+            document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+            el.classList.add("active");
+
+            if(page === "market") { document.getElementById("pageMarket").classList.add("active"); loadProducts(); }
+            if(page === "add") { document.getElementById("pageAdd").classList.add("active"); }
+            if(page === "admin") { document.getElementById("pageAdmin").classList.add("active"); loadPendingProducts(); }
+        }
+
+        async function loadPendingProducts() {
+            const res = await fetch(`/api/products?status=pending&user_id=${user.id}`);
+            if(!res.ok) return;
+            const products = await res.json();
+
+            const container = document.getElementById("pendingContainer");
+            container.innerHTML = products.length ? "" : `<p>Tasdiqlanmagan e'lonlar yo'q.</p>`;
+
+            products.forEach(p => {
+                container.innerHTML += `
+                    <div style="background:#fff; padding:10px; border-radius:8px; margin-bottom:10px;">
+                        <h4>${p.title} - ${p.price} UZS</h4>
+                        <p style="font-size:12px;">${p.description}</p>
+                        <div style="display:flex; gap:10px; margin-top:8px;">
+                            <button onclick="moderate(${p.id}, 'approve')" style="flex:1; background:#28a745; color:#fff; border:none; padding:6px; border-radius:4px;">Tasdiqlash</button>
+                            <button onclick="moderate(${p.id}, 'reject')" style="flex:1; background:#dc3545; color:#fff; border:none; padding:6px; border-radius:4px;">Rad Etish</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        async function moderate(id, action) {
+            const formData = new FormData();
+            formData.append("product_id", id);
+            formData.append("action", action);
+            formData.append("user_id", user.id);
+
+            await fetch("/api/admin/moderate", { method: "POST", body: formData });
+            loadPendingProducts();
+        }
+
+        async function changeRole(newRole) {
+            const targetId = document.getElementById("targetAdminId").value;
+            if(!targetId) return alert("ID kiriting!");
+
+            const formData = new FormData();
+            formData.append("target_id", targetId);
+            formData.append("new_role", newRole);
+            formData.append("requester_id", user.id);
+
+            const res = await fetch("/api/admin/manage-role", { method: "POST", body: formData });
+            const data = await res.json();
+            alert(data.message);
+        }
+
+        document.getElementById("addForm").addEventListener("submit", async function(e) {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append("title", document.getElementById("addTitle").value);
+            formData.append("category", document.getElementById("addCategory").value);
+            formData.append("description", document.getElementById("addDesc").value);
+            formData.append("price", document.getElementById("addPrice").value);
+            formData.append("old_price", document.getElementById("addOldPrice").value);
+            formData.append("user_id", user.id);
+            formData.append("username", user.username || "");
+            formData.append("image", document.getElementById("addImage").files[0]);
+
+            const res = await fetch("/api/products/add", { method: "POST", body: formData });
+            const data = await res.json();
+
+            alert(data.message);
+            this.reset();
+            nav("market", document.querySelectorAll(".nav-item")[0]);
+        });
+
+        init();
+    </script>
+</body>
+</html>
