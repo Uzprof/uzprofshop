@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Form
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 
@@ -17,14 +16,11 @@ DB_PATH = "uzprof.db"
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# --- PAPKA VA FAYLLARNI AVTOMATIK YARATISH ---
+# --- STATIC PAPKANI YARATISH ---
 os.makedirs("static", exist_ok=True)
-os.makedirs("templates", exist_ok=True)
 
-index_html_path = os.path.join("templates", "index.html")
-if not os.path.exists(index_html_path):
-    with open(index_html_path, "w", encoding="utf-8") as f:
-        f.write("""<!DOCTYPE html>
+# --- HTML SAHIFA (TASHQI FAYLLARGA HOJAT YO'Q) ---
+HTML_CONTENT = """<!DOCTYPE html>
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
@@ -92,7 +88,7 @@ if not os.path.exists(index_html_path):
         }
     </script>
 </body>
-</html>""")
+</html>"""
 
 # --- BAZANI YARATISH ---
 def init_db():
@@ -161,7 +157,6 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="Uzprof.shop API", lifespan=lifespan)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
-templates = Jinja2Templates(directory="templates")
 
 # --- TELEGRAM WEBHOOK QULOG'I ---
 @app.post("/webhook")
@@ -178,7 +173,7 @@ async def telegram_webhook(request: Request):
 # --- WEB APP YO'LLARI ---
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return HTMLResponse(content=HTML_CONTENT)
 
 @app.post("/add_admin")
 async def add_admin_endpoint(telegram_id: int = Form(...)):
