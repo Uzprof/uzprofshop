@@ -8,9 +8,10 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 # --- SOZLAMALAR VA ID'LAR ---
-BOT_TOKEN = "8784665419:AAE8dF85EpYIA4vWX_5CTP30jzumqIUfREg"  # O'z bot tokeningizni yozing
+BOT_TOKEN = "8784665419:AAE8dF85EpYIA4vWX_5CTP30jzumqIUfREg"  # Tokeningiz
 DOMAIN = "https://uzprofshop.onrender.com"
 DB_PATH = "uzprof.db"
 
@@ -22,7 +23,7 @@ dp = Dispatcher()
 
 os.makedirs("static/uploads", exist_ok=True)
 
-# --- ZAMONAVIY VA CHIROYLI INTERFAYS (HTML/CSS/JS) ---
+# --- ZAMONAVIY VA KAFOLATLANGAN DIZAYN ---
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="uz">
 <head>
@@ -41,284 +42,70 @@ HTML_CONTENT = """<!DOCTYPE html>
             --text-muted: #94a3b8;
             --accent: #38bdf8;
         }
+        body { font-family: 'Inter', system-ui, sans-serif; background: var(--bg-gradient); color: var(--text-main); min-height: 100vh; margin: 0; padding: 16px; }
+        .app-container { max-width: 480px; margin: 0 auto; padding-bottom: 80px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-glass); padding: 14px 18px; border-radius: 16px; }
+        .logo { font-size: 18px; font-weight: 800; background: linear-gradient(90deg, #818cf8, #38bdf8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .user-badge { font-size: 11px; background: rgba(99, 102, 241, 0.2); color: #818cf8; padding: 4px 10px; border-radius: 20px; border: 1px solid rgba(99, 102, 241, 0.3); }
         
-        body {
-            font-family: 'Inter', system-ui, -apple-system, sans-serif;
-            background: var(--bg-gradient);
-            color: var(--text-main);
-            min-height: 100vh;
-            margin: 0;
-            padding: 0;
-        }
+        .search-box { position: relative; margin-bottom: 15px; }
+        .search-box input { width: 100%; padding: 12px 16px 12px 42px; background: var(--card-bg); border: 1px solid var(--border-glass); border-radius: 12px; color: #fff; font-size: 14px; outline: none; box-sizing: border-box; }
+        .search-icon { position: absolute; left: 14px; top: 14px; color: var(--text-muted); }
 
-        .app-container {
-            max-width: 480px;
-            margin: 0 auto;
-            padding: 20px 16px 80px 16px;
-        }
-
-        /* Header */
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--border-glass);
-            padding: 14px 18px;
-            border-radius: 16px;
-        }
-        .logo {
-            font-size: 18px;
-            font-weight: 800;
-            background: linear-gradient(90deg, #818cf8, #38bdf8);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .user-badge {
-            font-size: 11px;
-            background: rgba(99, 102, 241, 0.2);
-            color: #818cf8;
-            padding: 4px 10px;
-            border-radius: 20px;
-            border: 1px solid rgba(99, 102, 241, 0.3);
-        }
-
-        /* Search & Menu */
-        .search-box {
-            position: relative;
-            margin-bottom: 15px;
-        }
-        .search-box input {
-            width: 100%;
-            padding: 12px 16px 12px 42px;
-            background: var(--card-bg);
-            border: 1px solid var(--border-glass);
-            border-radius: 12px;
-            color: #fff;
-            font-size: 14px;
-            outline: none;
-            box-sizing: border-box;
-            transition: 0.2s;
-        }
-        .search-box input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
-        }
-        .search-icon {
-            position: absolute;
-            left: 14px;
-            top: 14px;
-            color: var(--text-muted);
-        }
-
-        /* Categories Menu */
-        .menu-scroll {
-            display: flex;
-            gap: 8px;
-            overflow-x: auto;
-            padding-bottom: 5px;
-            margin-bottom: 20px;
-            scrollbar-width: none;
-        }
+        .menu-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 5px; margin-bottom: 20px; scrollbar-width: none; }
         .menu-scroll::-webkit-scrollbar { display: none; }
-        .menu-pill {
-            background: var(--card-bg);
-            border: 1px solid var(--border-glass);
-            color: var(--text-muted);
-            padding: 8px 14px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-            white-space: nowrap;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .menu-pill.active {
-            background: var(--primary);
-            color: #fff;
-            border-color: var(--primary);
-        }
+        .menu-pill { background: var(--card-bg); border: 1px solid var(--border-glass); color: var(--text-muted); padding: 8px 14px; border-radius: 20px; font-size: 12px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+        .menu-pill.active { background: var(--primary); color: #fff; border-color: var(--primary); }
 
-        /* Bottom Nav Tabs */
-        .nav-tabs {
-            display: flex;
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--border-glass);
-            padding: 6px;
-            border-radius: 14px;
-            margin-bottom: 20px;
-        }
-        .tab-btn {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            padding: 10px;
-            font-size: 13px;
-            font-weight: 600;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: 0.2s;
-            text-align: center;
-        }
-        .tab-btn.active {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-        }
+        .nav-tabs { display: flex; background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-glass); padding: 6px; border-radius: 14px; margin-bottom: 20px; }
+        .tab-btn { flex: 1; background: transparent; border: none; color: var(--text-muted); padding: 10px; font-size: 13px; font-weight: 600; border-radius: 10px; cursor: pointer; text-align: center; }
+        .tab-btn.active { background: rgba(255, 255, 255, 0.1); color: #fff; }
 
-        /* Product Cards Grid */
-        .product-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 16px;
-        }
-        .card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--border-glass);
-            border-radius: 16px;
-            overflow: hidden;
-            transition: transform 0.2s;
-        }
-        .card img {
-            width: 100%;
-            height: 180px;
-            object-fit: cover;
-            background: #1e293b;
-        }
-        .card-body {
-            padding: 16px;
-        }
-        .card-cat {
-            font-size: 11px;
-            color: var(--accent);
-            text-transform: uppercase;
-            font-weight: 700;
-            letter-spacing: 0.5px;
-            margin-bottom: 6px;
-        }
-        .card-title {
-            font-size: 16px;
-            font-weight: 700;
-            margin: 0 0 8px 0;
-            color: #fff;
-        }
-        .card-desc {
-            font-size: 13px;
-            color: var(--text-muted);
-            margin: 0;
-            line-height: 1.4;
-        }
+        .product-grid { display: grid; grid-template-columns: 1fr; gap: 16px; }
+        .card { background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-glass); border-radius: 16px; overflow: hidden; }
+        .card img { width: 100%; height: 180px; object-fit: cover; background: #1e293b; }
+        .card-body { padding: 16px; }
+        .card-cat { font-size: 11px; color: var(--accent); text-transform: uppercase; font-weight: 700; margin-bottom: 6px; }
+        .card-title { font-size: 16px; font-weight: 700; margin: 0 0 8px 0; color: #fff; }
+        .card-desc { font-size: 13px; color: var(--text-muted); margin: 0; line-height: 1.4; }
 
-        /* Forms (Add & Admin) */
-        .form-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            border: 1px solid var(--border-glass);
-            padding: 20px;
-            border-radius: 16px;
-        }
-        .form-group {
-            margin-bottom: 14px;
-        }
-        label {
-            display: block;
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-muted);
-            margin-bottom: 6px;
-        }
-        input, select, textarea {
-            width: 100%;
-            padding: 12px;
-            background: rgba(15, 23, 42, 0.6);
-            border: 1px solid var(--border-glass);
-            border-radius: 10px;
-            color: #fff;
-            font-size: 14px;
-            box-sizing: border-box;
-            outline: none;
-        }
-        input:focus, select:focus, textarea:focus {
-            border-color: var(--primary);
-        }
-        .btn-submit {
-            width: 100%;
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 14px;
-            border-radius: 10px;
-            font-weight: 700;
-            font-size: 14px;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .btn-submit:hover { background: var(--primary-hover); }
-
-        .admin-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background: rgba(0,0,0,0.2);
-            padding: 10px 14px;
-            border-radius: 10px;
-            margin-bottom: 8px;
-            font-size: 13px;
-        }
-        .delete-btn {
-            background: #ef4444;
-            color: white;
-            border: none;
-            padding: 6px 12px;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 11px;
-            font-weight: bold;
-        }
+        .form-card { background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid var(--border-glass); padding: 20px; border-radius: 16px; }
+        .form-group { margin-bottom: 14px; }
+        label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+        input, select, textarea { width: 100%; padding: 12px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border-glass); border-radius: 10px; color: #fff; font-size: 14px; box-sizing: border-box; outline: none; }
+        .btn-submit { width: 100%; background: var(--primary); color: white; border: none; padding: 14px; border-radius: 10px; font-weight: 700; font-size: 14px; cursor: pointer; }
+        .admin-item { display: flex; justify-content: space-between; align-items: center; background: rgba(0,0,0,0.2); padding: 10px 14px; border-radius: 10px; margin-bottom: 8px; font-size: 13px; }
+        .delete-btn { background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; }
     </style>
 </head>
 <body>
-
     <div class="app-container">
-        <!-- Header -->
         <div class="header">
             <div class="logo">⚡ Uzprof.shop</div>
-            <div class="user-badge" id="userBadge">ID: yuklanmoqda...</div>
+            <div class="user-badge" id="userBadge">ID aniqlanmoqda...</div>
         </div>
 
-        <!-- Navigation Tabs -->
         <div class="nav-tabs">
             <button class="tab-btn active" onclick="switchTab('feed')" id="tabFeed">📦 E'lonlar</button>
             <button class="tab-btn" onclick="switchTab('add')" id="tabAdd">➕ E'lon berish</button>
-            <button class="tab-btn" onclick="switchTab('admin')" id="tabAdmin" style="display:none;">⚙️ Admin</button>
+            <button class="tab-btn" onclick="switchTab('admin')" id="tabAdmin" style="display:none;">⚙️ Admin Panel</button>
         </div>
 
-        <!-- Feed Section -->
         <div id="sectionFeed">
             <div class="search-box">
                 <span class="search-icon">🔍</span>
                 <input type="text" id="searchInput" placeholder="Xizmat yoki mahsulotlarni qidirish..." oninput="filterProducts()">
             </div>
-
-            <!-- Categories Menu -->
-            <div class="menu-scroll" id="menuScroll">
+            <div class="menu-scroll">
                 <div class="menu-pill active" onclick="selectCategory('Barchasi', this)">🔥 Barchasi</div>
                 <div class="menu-pill" onclick="selectCategory('Telegram Botlar', this)">🤖 Telegram Botlar</div>
                 <div class="menu-pill" onclick="selectCategory('Web Dasturlash', this)">💻 Web Dasturlash</div>
                 <div class="menu-pill" onclick="selectCategory('Skriptlar va Kodlar', this)">📜 Skriptlar</div>
                 <div class="menu-pill" onclick="selectCategory('Dizayn va Grafika', this)">🎨 Dizayn</div>
             </div>
-
-            <div class="product-grid" id="productGrid">
-                <!-- E'lonlar shu yerga tushadi -->
-            </div>
+            <div class="product-grid" id="productGrid"></div>
         </div>
 
-        <!-- Add Product Section -->
         <div id="sectionAdd" style="display:none;">
             <div class="form-card">
                 <h3 style="margin-top:0; color:#fff;">Yangi E'lon Qo'shish</h3>
@@ -348,14 +135,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- Admin Panel Section -->
         <div id="sectionAdmin" style="display:none;">
             <div class="form-card">
                 <h3 style="margin-top:0; color:#fff;">Admin Boshqaruvi</h3>
                 <p style="font-size:12px; color:var(--text-muted);">Barcha e'lonlarni boshqarish va o'chirish.</p>
-                <div id="adminProductList">
-                    <!-- Admin mahsulotlari -->
-                </div>
+                <div id="adminProductList"></div>
             </div>
         </div>
     </div>
@@ -364,12 +148,17 @@ HTML_CONTENT = """<!DOCTYPE html>
         let tg = window.Telegram.WebApp;
         tg.expand();
         
-        let user = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user : { id: 7686687044, first_name: "Owner" };
-        document.getElementById('userBadge').innerText = `ID: ${user.id}`;
+        // Telegram ID ni aniqlash (Agar brauzerdan ochilsa URL parametridan oladi)
+        const urlParams = new URLSearchParams(window.location.search);
+        let urlUserId = urlParams.get('user_id');
 
-        // Admin ekanligini tekshirish (Owner: 7686687044, Admin: 7875662532)
+        let userId = (tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user.id : (urlUserId ? parseInt(urlUserId) : 7686687044);
+        
+        document.getElementById('userBadge').innerText = `ID: ${userId}`;
+
+        // Adminlar ro'yxati
         const ADMINS = [7686687044, 7875662532];
-        if (ADMINS.includes(user.id)) {
+        if (ADMINS.includes(userId)) {
             document.getElementById('tabAdmin').style.display = 'block';
         }
 
@@ -398,7 +187,6 @@ HTML_CONTENT = """<!DOCTYPE html>
         function renderProducts(products) {
             let grid = document.getElementById('productGrid');
             grid.innerHTML = '';
-
             let query = document.getElementById('searchInput').value.toLowerCase();
             
             let filtered = products.filter(p => {
@@ -434,13 +222,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             renderProducts(allProducts);
         }
 
-        function filterProducts() {
-            renderProducts(allProducts);
-        }
+        function filterProducts() { renderProducts(allProducts); }
 
         async function submitProduct() {
             let fd = new FormData();
-            fd.append("user_id", user.id);
+            fd.append("user_id", userId);
             fd.append("category", document.getElementById('pCat').value);
             fd.append("title", document.getElementById('pTitle').value);
             fd.append("description", document.getElementById('pDesc').value);
@@ -490,14 +276,10 @@ HTML_CONTENT = """<!DOCTYPE html>
             if (!confirm("Rostdan ham bu e'lonni o'chirmoqchimisiz?")) return;
             let fd = new URLSearchParams();
             fd.append("product_id", id);
-            fd.append("user_id", user.id);
+            fd.append("user_id", userId);
             let res = await fetch('/api/delete_product', { method: 'POST', body: fd });
             let data = await res.json();
-            if (data.success) {
-                loadAdminProducts();
-            } else {
-                alert(data.message);
-            }
+            if (data.success) loadAdminProducts();
         }
 
         loadProducts();
@@ -505,7 +287,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 </body>
 </html>"""
 
-# --- BAZA BILAN ISHLASH ---
+# --- BAZA VA SERVER ---
 def init_db():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -550,27 +332,10 @@ async def get_products():
     c.execute("SELECT id, user_id, category, title, description, image_path FROM products ORDER BY id DESC")
     rows = c.fetchall()
     conn.close()
-    
-    products = []
-    for r in rows:
-        products.append({
-            "id": r[0],
-            "user_id": r[1],
-            "category": r[2],
-            "title": r[3],
-            "description": r[4],
-            "image_path": r[5]
-        })
-    return products
+    return [{"id": r[0], "user_id": r[1], "category": r[2], "title": r[3], "description": r[4], "image_path": r[5]} for r in rows]
 
 @app.post("/api/add_product")
-async def add_product(
-    user_id: int = Form(...),
-    category: str = Form(...),
-    title: str = Form(...),
-    description: str = Form(...),
-    image: UploadFile = File(None)
-):
+async def add_product(user_id: int = Form(...), category: str = Form(...), title: str = Form(...), description: str = Form(...), image: UploadFile = File(None)):
     image_url = None
     if image and image.filename:
         ext = image.filename.split(".")[-1]
@@ -582,15 +347,11 @@ async def add_product(
 
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute(
-        "INSERT INTO products (user_id, category, title, description, image_path) VALUES (?, ?, ?, ?, ?)",
-        (user_id, category, title, description, image_url)
-    )
+    c.execute("INSERT INTO products (user_id, category, title, description, image_path) VALUES (?, ?, ?, ?, ?)", (user_id, category, title, description, image_url))
     conn.commit()
     conn.close()
 
-    # Adminlarga xabar yuborish
-    notif = f"📦 **Yangi raqamiy e'lon!**\n\n🏷️ Kategoriya: {category}\n📝 Nomi: {title}\n📄 Tavsif: {description}\n👤 User ID: {user_id}"
+    notif = f"📦 **Yangi e'lon!**\n\n🏷️ Kategoriya: {category}\n📝 Nomi: {title}\n📄 Tavsif: {description}"
     for admin in [OWNER_ID, ADMIN_ID]:
         try:
             if image_url:
@@ -606,7 +367,6 @@ async def add_product(
 async def delete_product(product_id: int = Form(...), user_id: int = Form(...)):
     if user_id not in [OWNER_ID, ADMIN_ID]:
         return {"success": False, "message": "Sizda bu huquq yo'q!"}
-    
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("DELETE FROM products WHERE id = ?", (product_id,))
@@ -619,6 +379,9 @@ async def webhook(req: Request):
     await dp.feed_update(bot, types.Update(**await req.json()))
     return {"ok": True}
 
+# --- BOT BUYRUQLARI (WEB-APP TUGMA BILAN) ---
 @dp.message(Command("start"))
 async def start(msg: types.Message):
-    await msg.answer("⚡ **Uzprof.shop** — Raqamli xizmatlar va mahsulotlar bozoriga xush kelibsiz!\n\nVeb-ilovaga kirib o'z xizmatlaringizni e'lon qilishingiz mumkin.")
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🚀 Uzprof.shop ni ochish", web_app=types.WebAppInfo(url=f"{DOMAIN}/?user_id={msg.from_user.id}"))
+    await msg.answer("⚡ **Uzprof.shop** — Raqamli xizmatlar bozori!\n\nPastdagi tugmani bosing:", reply_markup=kb.as_markup())
