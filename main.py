@@ -17,7 +17,7 @@ DB_PATH = "uzprof.db"
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
-# --- PAPKA VA FAYLLARNI AVTOMATIK YARATISH (XATOLIKNI OLDINI OLISH) ---
+# --- PAPKA VA FAYLLARNI AVTOMATIK YARATISH ---
 os.makedirs("static", exist_ok=True)
 os.makedirs("templates", exist_ok=True)
 
@@ -139,7 +139,7 @@ def check_is_admin(telegram_id: int) -> bool:
         conn.close()
     return False
 
-# --- WEBHOOK BILAN ISHGA TUSHISH (LIFESPAN) ---
+# --- WEBHOOK BILAN ISHGA TUSHISH ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
@@ -239,7 +239,7 @@ async def delete_product(product_id: int = Form(...), user_id: int = Form(...)):
         if owner_id == user_id or check_is_admin(user_id):
             cursor.execute("DELETE FROM products WHERE id = ?", (product_id,))
             conn.commit()
-            return JSONResponse({"success":` True, "message": "E'lon o'chirildi!"})
+            return JSONResponse({"success": True, "message": "E'lon o'chirildi!"})
         else:
             return JSONResponse({"success": False, "message": "Huquqingiz yo'q!"}, status_code=403)
     except Exception as e:
