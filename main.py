@@ -3,8 +3,8 @@ import shutil
 import sqlite3
 import asyncio
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, Form, UploadFile, File
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, Form, UploadFile, File
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 # --- SOZLAMALAR ---
@@ -51,7 +51,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 <html lang="uz">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Uzprof.shop</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
@@ -59,10 +59,12 @@ HTML_CONTENT = """<!DOCTYPE html>
             --bg-color: #f3f4f6;
             --card-bg: #ffffff;
             --primary: #6d28d9;
+            --primary-hover: #5b21b6;
             --text-main: #111827;
             --text-muted: #6b7280;
             --border: #e5e7eb;
         }
+        * { box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; padding: 12px; padding-bottom: 80px; }
         .container { max-width: 480px; margin: 0 auto; }
         
@@ -70,11 +72,11 @@ HTML_CONTENT = """<!DOCTYPE html>
         .logo { font-size: 22px; font-weight: 900; color: var(--primary); }
         .badge { font-size: 10px; font-weight: 800; background: #e5e7eb; color: #374151; padding: 3px 8px; border-radius: 6px; }
 
-        .search-box input { width: 100%; padding: 10px 14px; background: #ffffff; border: 1px solid var(--border); border-radius: 10px; font-size: 13px; color: var(--text-main); box-sizing: border-box; outline: none; margin-bottom: 12px; }
+        .search-box input { width: 100%; padding: 10px 14px; background: #ffffff; border: 1px solid var(--border); border-radius: 10px; font-size: 13px; color: var(--text-main); outline: none; margin-bottom: 12px; }
         
         .categories { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 14px; scrollbar-width: none; }
         .categories::-webkit-scrollbar { display: none; }
-        .cat-pill { background: #ffffff; border: 1px solid var(--border); color: #374151; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; }
+        .cat-pill { background: #ffffff; border: 1px solid var(--border); color: #374151; padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer; user-select: none; }
         .cat-pill.active { background: var(--primary); color: #ffffff; border-color: var(--primary); }
 
         .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -83,21 +85,21 @@ HTML_CONTENT = """<!DOCTYPE html>
         .card-body { padding: 10px; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
         .card-title { font-size: 13px; font-weight: 700; color: var(--text-main); margin-bottom: 6px; line-height: 1.2; }
         .price-box { margin-bottom: 8px; }
-        .price { font-size: 14px; font-weight: 800; color: var(--primary); }
-        .old-price { font-size: 11px; color: var(--text-muted); text-decoration: line-through; margin-left: 4px; }
-        .btn-contact { width: 100%; background: var(--primary); color: white; border: none; padding: 8px 0; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; text-decoration: none; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+        .price { font-size: 13px; font-weight: 800; color: var(--primary); }
+        .old-price { font-size: 10px; color: var(--text-muted); text-decoration: line-through; margin-left: 4px; }
+        .btn-contact { width: 100%; background: var(--primary); color: white; border: none; padding: 8px 0; border-radius: 8px; font-size: 11px; font-weight: 700; cursor: pointer; text-decoration: none; display: flex; align-items: center; justify-content: center; }
 
         .form-card { background: white; padding: 16px; border-radius: 14px; border: 1px solid var(--border); margin-bottom: 12px; }
         .form-group { margin-bottom: 10px; }
         label { display: block; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 4px; }
-        input, select, textarea { width: 100%; padding: 10px; background: #f9fafb; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; box-sizing: border-box; outline: none; }
+        input, select, textarea { width: 100%; padding: 10px; background: #f9fafb; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; outline: none; }
         .btn-submit { width: 100%; background: var(--primary); color: white; border: none; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer; }
 
         .admin-item { display: flex; justify-content: space-between; align-items: center; background: #f9fafb; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 6px; font-size: 12px; }
         .btn-del { background: #ef4444; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: bold; }
 
         .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #ffffff; border-top: 1px solid var(--border); display: flex; justify-content: space-around; padding: 8px 0; max-width: 480px; margin: 0 auto; z-index: 999; }
-        .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 10px; color: var(--text-muted); cursor: pointer; border: none; background: transparent; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; font-size: 10px; color: var(--text-muted); cursor: pointer; border: none; background: transparent; width: 33.3%; }
         .nav-item.active { color: var(--primary); font-weight: 700; }
         .nav-item svg { width: 20px; height: 20px; margin-bottom: 2px; fill: currentColor; }
     </style>
@@ -147,7 +149,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- Admin Section (ONLY FOR OWNER) -->
+        <!-- Admin Section -->
         <div id="secAdmin" style="display:none;">
             <div class="form-card">
                 <h4 style="margin:0 0 10px 0;">Admin Qo'shish</h4>
@@ -166,7 +168,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         </div>
     </div>
 
-    <!-- Bottom Navigation Bar -->
+    <!-- Bottom Nav -->
     <div class="bottom-nav">
         <button class="nav-item active" onclick="nav('feed')" id="navFeed">
             <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>Bozor
@@ -181,47 +183,59 @@ HTML_CONTENT = """<!DOCTYPE html>
 
     <script>
         const OWNER_ID = 7686687044;
-        let userId = 7686687044;
+        let userId = 0;
+        let currentCat = 'Barchasi';
+        let allProducts = [];
 
+        // Telegram WebApp initialization
         try {
             if (window.Telegram && window.Telegram.WebApp) {
-                let tg = window.Telegram.WebApp;
+                const tg = window.Telegram.WebApp;
                 tg.ready();
                 tg.expand();
                 if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
                     userId = tg.initDataUnsafe.user.id;
                 }
             }
-        } catch(e){}
-
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('user_id')) userId = parseInt(urlParams.get('user_id'));
-
-        let currentCat = 'Barchasi';
-        let allProducts = [];
-
-        function initApp() {
-            // FAQAT OWNERGA ADMIN PANELNI KO'RSATISH
-            if (userId === OWNER_ID) {
-                document.getElementById('navAdmin').style.display = 'flex';
-                document.getElementById('roleBadge').innerText = 'OWNER';
-            } else {
-                document.getElementById('navAdmin').style.display = 'none';
-                document.getElementById('roleBadge').innerText = 'USER';
-            }
-            loadProducts();
+        } catch (e) {
+            console.warn("WebApp init warning:", e);
         }
 
-        function nav(tab) {
-            document.getElementById('secFeed').style.display = tab === 'feed' ? 'block' : 'none';
-            document.getElementById('secAdd').style.display = tab === 'add' ? 'block' : 'none';
-            document.getElementById('secAdmin').style.display = tab === 'admin' ? 'block' : 'none';
+        // Test uchun URL parametridan ID olish
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('user_id')) {
+            userId = parseInt(urlParams.get('user_id'));
+        }
 
-            document.getElementById('navFeed').classList.toggle('active', tab === 'feed');
-            document.getElementById('navAdd').classList.toggle('active', tab === 'add');
-            if (document.getElementById('navAdmin')) {
-                document.getElementById('navAdmin').classList.toggle('active', tab === 'admin');
+        // Agar brauzerda ochilsa, default qilib OWNER_ID beriladi
+        if (!userId) userId = OWNER_ID;
+
+        document.addEventListener("DOMContentLoaded", function () {
+            if (userId === OWNER_ID) {
+                const navAdmin = document.getElementById('navAdmin');
+                const roleBadge = document.getElementById('roleBadge');
+                if (navAdmin) navAdmin.style.display = 'flex';
+                if (roleBadge) roleBadge.innerText = 'SUPERADMIN';
             }
+            loadProducts();
+        });
+
+        function nav(tab) {
+            const secFeed = document.getElementById('secFeed');
+            const secAdd = document.getElementById('secAdd');
+            const secAdmin = document.getElementById('secAdmin');
+
+            if (secFeed) secFeed.style.display = tab === 'feed' ? 'block' : 'none';
+            if (secAdd) secAdd.style.display = tab === 'add' ? 'block' : 'none';
+            if (secAdmin) secAdmin.style.display = tab === 'admin' ? 'block' : 'none';
+
+            const navFeed = document.getElementById('navFeed');
+            const navAdd = document.getElementById('navAdd');
+            const navAdmin = document.getElementById('navAdmin');
+
+            if (navFeed) navFeed.classList.toggle('active', tab === 'feed');
+            if (navAdd) navAdd.classList.toggle('active', tab === 'add');
+            if (navAdmin) navAdmin.classList.toggle('active', tab === 'admin');
 
             if (tab === 'feed') loadProducts();
             if (tab === 'admin') loadAdminProducts();
@@ -232,40 +246,49 @@ HTML_CONTENT = """<!DOCTYPE html>
                 let res = await fetch('/api/products');
                 allProducts = await res.json();
                 renderProducts(allProducts);
-            } catch(e){}
+            } catch (e) {
+                console.error("Fetch error:", e);
+            }
         }
 
         function renderProducts(products) {
-            let grid = document.getElementById('productGrid');
-            if(!grid) return;
+            const grid = document.getElementById('productGrid');
+            if (!grid) return;
             grid.innerHTML = '';
-            let q = (document.getElementById('searchInput').value || '').toLowerCase();
+
+            const searchInput = document.getElementById('searchInput');
+            const query = searchInput ? searchInput.value.toLowerCase().trim() : '';
 
             let filtered = products.filter(p => {
-                let mCat = (currentCat === 'Barchasi' || p.category === currentCat);
-                let mQ = (p.title || '').toLowerCase().includes(q) || (p.description || '').toLowerCase().includes(q);
-                return mCat && mQ;
+                let matchCat = (currentCat === 'Barchasi' || p.category === currentCat);
+                let matchQuery = (p.title || '').toLowerCase().includes(query) || (p.description || '').toLowerCase().includes(query);
+                return matchCat && matchQuery;
             });
 
             if (filtered.length === 0) {
-                grid.innerHTML = '<p style="grid-column: span 2; text-align:center; font-size:12px; color:var(--text-muted); margin-top:20px;">E\'lonlar topilmadi.</p>';
+                grid.innerHTML = '<p style="grid-column: span 2; text-align:center; font-size:12px; color:var(--text-muted); margin-top:20px;">Hozircha e\'lonlar mavjud emas.</p>';
                 return;
             }
 
             filtered.forEach(p => {
                 let card = document.createElement('div');
                 card.className = 'card';
+                let contactLink = p.contact_url || '#';
+                if (contactLink && !contactLink.startsWith('http')) {
+                    contactLink = 'https://t.me/' + contactLink.replace('@', '');
+                }
+
                 card.innerHTML = `
-                    ${p.image_path ? `<img src="${p.image_path}" class="card-img">` : ''}
+                    ${p.image_path ? `<img src="${p.image_path}" class="card-img" alt="img">` : ''}
                     <div class="card-body">
                         <div>
-                            <div class="card-title">${p.title}</div>
+                            <div class="card-title">${p.title || ''}</div>
                             <div class="price-box">
                                 <span class="price">${p.price || ''}</span>
                                 ${p.old_price ? `<span class="old-price">${p.old_price}</span>` : ''}
                             </div>
                         </div>
-                        <a href="${p.contact_url || '#'}" target="_blank" class="btn-contact">💬 Aloqaga Chiqish</a>
+                        <a href="${contactLink}" target="_blank" class="btn-contact">💬 Aloqaga Chiqish</a>
                     </div>
                 `;
                 grid.appendChild(card);
@@ -275,19 +298,23 @@ HTML_CONTENT = """<!DOCTYPE html>
         function setCat(cat, el) {
             currentCat = cat;
             document.querySelectorAll('.cat-pill').forEach(c => c.classList.remove('active'));
-            el.classList.add('active');
+            if (el) el.classList.add('active');
             renderProducts(allProducts);
         }
 
-        function filterProducts() { renderProducts(allProducts); }
+        function filterProducts() {
+            renderProducts(allProducts);
+        }
 
         async function submitProduct() {
-            let title = document.getElementById('pTitle').value.trim();
-            let desc = document.getElementById('pDesc').value.trim();
-            let msg = document.getElementById('addMsg');
+            const title = document.getElementById('pTitle').value.trim();
+            const desc = document.getElementById('pDesc').value.trim();
+            const msg = document.getElementById('addMsg');
 
             if (!title || !desc) {
-                msg.style.color = 'red'; msg.innerText = 'Sarlavha va tavsifni to\'ldiring!'; return;
+                msg.style.color = 'red';
+                msg.innerText = 'Sarlavha va tavsifni to\'ldiring!';
+                return;
             }
 
             let fd = new FormData();
@@ -298,10 +325,14 @@ HTML_CONTENT = """<!DOCTYPE html>
             fd.append("price", document.getElementById('pPrice').value);
             fd.append("old_price", document.getElementById('pOldPrice').value);
             fd.append("contact_url", document.getElementById('pContact').value);
-            let img = document.getElementById('pImage').files[0];
-            if (img) fd.append("image", img);
+            
+            let imgInput = document.getElementById('pImage');
+            if (imgInput && imgInput.files[0]) {
+                fd.append("image", imgInput.files[0]);
+            }
 
-            msg.style.color = 'blue'; msg.innerText = 'Joylanmoqda...';
+            msg.style.color = 'blue';
+            msg.innerText = 'Joylanmoqda...';
 
             try {
                 let res = await fetch('/api/add_product', { method: 'POST', body: fd });
@@ -312,14 +343,15 @@ HTML_CONTENT = """<!DOCTYPE html>
                 if (data.success) {
                     document.getElementById('pTitle').value = '';
                     document.getElementById('pDesc').value = '';
-                    document.getElementById('pImage').value = '';
+                    if (imgInput) imgInput.value = '';
                     document.getElementById('pPrice').value = '';
                     document.getElementById('pOldPrice').value = '';
                     document.getElementById('pContact').value = '';
-                    setTimeout(() => nav('feed'), 1000);
+                    setTimeout(() => nav('feed'), 800);
                 }
-            } catch(e){
-                msg.style.color = 'red'; msg.innerText = 'Xatolik yuz berdi!';
+            } catch (e) {
+                msg.style.color = 'red';
+                msg.innerText = 'Xatolik yuz berdi!';
             }
         }
 
@@ -327,11 +359,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             try {
                 let res = await fetch('/api/products');
                 let products = await res.json();
-                let container = document.getElementById('adminProdList');
-                if(!container) return;
+                const container = document.getElementById('adminProdList');
+                if (!container) return;
                 container.innerHTML = '';
 
-                if(products.length === 0) {
+                if (products.length === 0) {
                     container.innerHTML = '<p style="font-size:12px; color:var(--text-muted);">E\'lonlar yo\'q.</p>';
                     return;
                 }
@@ -340,12 +372,17 @@ HTML_CONTENT = """<!DOCTYPE html>
                     let div = document.createElement('div');
                     div.className = 'admin-item';
                     div.innerHTML = `
-                        <div><strong>${p.title}</strong><br><span style="color:var(--text-muted); font-size:10px;">${p.category}</span></div>
+                        <div>
+                            <strong>${p.title}</strong><br>
+                            <span style="color:var(--text-muted); font-size:10px;">${p.category} | ${p.price || ''}</span>
+                        </div>
                         <button class="btn-del" onclick="deleteProduct(${p.id})">O'chirish</button>
                     `;
                     container.appendChild(div);
                 });
-            } catch(e){}
+            } catch (e) {
+                console.error(e);
+            }
         }
 
         async function deleteProduct(id) {
@@ -353,16 +390,26 @@ HTML_CONTENT = """<!DOCTYPE html>
             let fd = new URLSearchParams();
             fd.append("product_id", id);
             fd.append("user_id", userId);
+
             let res = await fetch('/api/delete_product', { method: 'POST', body: fd });
             let data = await res.json();
-            if (data.success) loadAdminProducts();
-            else alert(data.message);
+            if (data.success) {
+                loadAdminProducts();
+            } else {
+                alert(data.message);
+            }
         }
 
         async function addAdmin() {
-            let uname = document.getElementById('adminUsername').value.trim();
-            let msg = document.getElementById('adminMsg');
-            if (!uname) { msg.style.color = 'red'; msg.innerText = 'Usernameni kiriting!'; return; }
+            const unameInput = document.getElementById('adminUsername');
+            const uname = unameInput ? unameInput.value.trim() : '';
+            const msg = document.getElementById('adminMsg');
+
+            if (!uname) {
+                msg.style.color = 'red';
+                msg.innerText = 'Usernameni kiriting!';
+                return;
+            }
 
             let fd = new URLSearchParams();
             fd.append("username", uname);
@@ -372,10 +419,8 @@ HTML_CONTENT = """<!DOCTYPE html>
             let data = await res.json();
             msg.style.color = data.success ? 'green' : 'red';
             msg.innerText = data.message;
-            if (data.success) document.getElementById('adminUsername').value = '';
+            if (data.success && unameInput) unameInput.value = '';
         }
-
-        window.onload = initApp;
     </script>
 </body>
 </html>"""
@@ -404,9 +449,9 @@ async def add_product(
     category: str = Form(...),
     title: str = Form(...),
     description: str = Form(...),
-    price: str = Form(None),
-    old_price: str = Form(None),
-    contact_url: str = Form(None),
+    price: str = Form(""),
+    old_price: str = Form(""),
+    contact_url: str = Form(""),
     image: UploadFile = File(None)
 ):
     image_url = None
